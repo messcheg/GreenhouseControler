@@ -9,53 +9,42 @@
 
 void handleStatus() {
   ESP8266WebServer& localServer = getWebServer();
-  String json;
-  json.reserve(256);
-  json = "{";
-  json += "\"fw\":\"" FW_VERSION "\"";
-  json += ",\"status\":\"OK\"";
-  json += ",\"ip\":\""; 
-  json += WiFi.localIP().toString(); 
-  json += "\"";
-  json += ",\"uptime_ms\":"; 
-  json += String(millis()); 
-  json += ",\"time\":\""; 
-  json += getCurrentTimeISO8601(); 
-  json += "\"";
-  json += ",\"scheduleCount\":"; 
-  json += String(getScheduleCount());
-  json += ",\"mode\":\"";
+  localServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
+  localServer.send(200, F("application/json"), "");
+  localServer.sendContent("{\"fw\":\"" FW_VERSION "\",\"status\":\"OK\",\"ip\":\"");
+  localServer.sendContent(WiFi.localIP().toString()); 
+  localServer.sendContent("\",\"uptime_ms\":"); 
+  localServer.sendContent(String(millis())); 
+  localServer.sendContent(",\"time\":\""); 
+  localServer.sendContent(getCurrentTimeISO8601()); 
+  localServer.sendContent("\",\"scheduleCount\":"); 
+  localServer.sendContent(String(getScheduleCount()));
+  localServer.sendContent(",\"mode\":\"");
 
   switch (getControlMode()) {
-    case MODE_AUTO: json += "auto"; break;
-    case MODE_MANUAL: json += "manual"; break;
-    case MODE_AUTO_AND_MANUAL: json += "auto+manual"; break;
-    case MODE_FORCED_OFF: json += "off (suppressed)"; break;
-    default: json += "off";
+    case MODE_AUTO: localServer.sendContent("auto"); break;
+    case MODE_MANUAL: localServer.sendContent("manual"); break;
+    case MODE_AUTO_AND_MANUAL: localServer.sendContent("auto+manual"); break;
+    case MODE_FORCED_OFF: localServer.sendContent("off (suppressed)"); break;
+    default: localServer.sendContent("off");
   }
-  json += "\",";
+  localServer.sendContent("\",\"valve_off_in\":");
   time_t valveOffTime = getValveOffTime(); 
   if (valveOffTime > time(nullptr)) {
-    json += "\"valve_off_in\":"; 
-    json += String(valveOffTime - time(nullptr)); 
-    json += ",";
+    localServer.sendContent(String(valveOffTime - time(nullptr))); 
   } else {
-    json += "\"valve_off_in\":0,";
+    localServer.sendContent("0");
   }
 
-  json += "\"controlpin\":\""; 
-  json += String(getPinStatus() == PIN_ON ? "ON" : "OFF"); 
-  json += "\"";
+  localServer.sendContent(",\"controlpin\":\""); 
+  localServer.sendContent(String(getPinStatus() == PIN_ON ? "ON" : "OFF")); 
+  localServer.sendContent("\",\"manual_can_on\":");
+  localServer.sendContent((getControlMode() == MODE_OFF || getControlMode() == MODE_AUTO) ? "true" : "false");
 
-  json += ",\"manual_can_on\":";
-  json += (getControlMode() == MODE_OFF || getControlMode() == MODE_AUTO) ? "true" : "false";
-
-  json += ",\"manual_can_off\":";
-  json += (getControlMode() == MODE_MANUAL || getControlMode() == MODE_AUTO_AND_MANUAL) ? "true" : "false";
-
-  json += "}";
-
-  localServer.send(200, F("application/json"), json);
+  localServer.sendContent(",\"manual_can_off\":");
+  localServer.sendContent((getControlMode() == MODE_MANUAL || getControlMode() == MODE_AUTO_AND_MANUAL) ? "true" : "false");
+  localServer.sendContent("}");
+  localServer.sendContent("");
 }
 
 void handleLed() {
@@ -116,6 +105,7 @@ void handleGetSchedule() {
   localServer.send(200, F("application/json"), json);
 }
 
+
 void handleAddSlot() {
   ESP8266WebServer& localServer = getWebServer();
   if (!localServer.hasArg("hour") || !localServer.hasArg("minute")) {
@@ -125,9 +115,26 @@ void handleAddSlot() {
 
   int hour   = localServer.arg("hour").toInt();
   int minute = localServer.arg("minute").toInt();
+  int startMonth = localServer.arg("startMonth").toInt();
+  int startDay   = localServer.arg("startDay").toInt();
+  int endMonth   = localServer.arg("endMonth").toInt();
+  int endDay     = localServer.arg("endDay").toInt();
 
   if (hour < 0 || hour > 23 || minute < 0 || minute > 59) {
     localServer.send(400, "text/plain", "Invalid time");
+    return;
+  }
+  const int maxDays[13] = {0, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+
+  // we will accept valid months or only 0's (which means always)
+  if (startMonth == 0 || endMonth == 0 || startDay == 0 || endDay == 0){
+    startMonth = endMonth = startDay = endDay = 0;
+  }
+  else if (startMonth < 1 || startMonth > 12 || 
+      endMonth < 1 || endMonth > 12 || 
+      startDay < 1 || startDay > maxDays[startMonth] ||
+      endDay < 1 || endDay > maxDays[endMonth] ) {
+    localServer.send(400, "text/plain", "Invalid date");
     return;
   }
 
@@ -141,10 +148,10 @@ void handleAddSlot() {
   slot.minute = minute;
   slot.action = localServer.arg("action") == "on" ? PIN_ON : PIN_OFF;
 
-  slot.startMonth = localServer.arg("startMonth").toInt();
-  slot.startDay   = localServer.arg("startDay").toInt();
-  slot.endMonth   = localServer.arg("endMonth").toInt();
-  slot.endDay     = localServer.arg("endDay").toInt();
+  slot.startMonth = startMonth;
+  slot.startDay   = startDay;
+  slot.endMonth   = endMonth;
+  slot.endDay     = endDay;
 
   slot.active = true;
 
@@ -198,6 +205,8 @@ void handleOneTime() {
 }
 
 void handleUpdateSlotActive() {
+// let op: hier nog zelfde validatie uitvoeren als bij Add
+
   ESP8266WebServer& localServer = getWebServer();
   if (!localServer.hasArg("id") || !localServer.hasArg("active")) {
     localServer.send(400, F("application/json"),

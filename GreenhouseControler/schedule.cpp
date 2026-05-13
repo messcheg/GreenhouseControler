@@ -130,45 +130,93 @@ PinAction actionAccordingToSchedule() {
   time_t now = time(nullptr);
   struct tm* t = localtime(&now);
 
-  // Time not valid yet
+  // Time not valid yet, we don't accept times before 2020
+  // time with fallbacks ensures that the time will be set after 2020
+  // so if the time isn't 2020 yet, initialisation has failed. 
+  // and the schedule should be defensive on spilling water.
   if (t->tm_year < (2020 - 1900)) {
     return PIN_OFF;
   }
 
-  TimeSlot* best = nullptr;
+  TimeSlot* previousSlot = nullptr;
+  TimeSlot* nextSlot = nullptr;
+  
+  // Scan today based on the fact that the slots are ordered
+  int slotCtr = 0;
+  bool ready = false;
+  while (!ready && slotCtr < scheduleCount) {
+    auto& slot = schedule[slotCtr];
 
-  // Scan today
-  for (int i = 0; i < scheduleCount; i++) {
-    auto& slot = schedule[i];
+    if (slot.active && isSlotActiveAtGivenDay(t, slot)) 
+    {
+      bool toLate = (t->tm_hour < slot.hour) || (t->tm_hour == slot.hour && t->tm_min <= slot.minute);
 
-    if (!slot.active) continue;
-    if (!isSlotActiveAtGivenDay(t, slot)) continue;
-
-    bool timeReached =
-      (t->tm_hour > slot.hour) ||
-      (t->tm_hour == slot.hour && t->tm_min >= slot.minute);
-
-    if (timeReached &&
-        (best == nullptr || isLater(slot, *best))) {
-      best = &slot;
-    }
-  }
-
-  // Yesterday fallback (CRITICAL BEHAVIOR)
-  if (best == nullptr) {
-    time_t yesterday = now - 86400;
-    struct tm* tYesterday = localtime(&yesterday);
-
-    for (int i = scheduleCount - 1; i >= 0; i--) {
-      auto& slot = schedule[i];
-      if (slot.active &&
-          isSlotActiveAtGivenDay(tYesterday, slot)) {
-        return slot.action;
+      if (toLate){
+        nextSlot = &slot;
+        ready = true;
+      }
+      else { 
+        if (previousSlot == nullptr) previousSlot = &slot;
+        else if (isLater(slot, *previousSlot)) previousSlot = &slot;
       }
     }
+    slotCtr++;
   }
 
-  return best ? best->action : PIN_OFF;
+  // Yesterday fallback 
+  // since this device is configured with local time, we know 
+  // that there is different behaviour during change of daytime savings
+  // fallback, if the previous and the next slot both are "on" we assume that 
+  // we forgot an "off" and we'll turn the water off.
+  // we don't want to water forever, so we will only investigate the previous and next day  
+  if (previousSlot == nullptr) {
+    time_t yesterday = now - 86400;
+    struct tm* tYesterday = localtime(&yesterday);
+    
+    slotCtr = scheduleCount - 1;
+    ready = false;
+    while(!ready && slotCtr >= 0) {
+      auto& slot = schedule[slotCtr];
+      if (slot.active &&
+          isSlotActiveAtGivenDay(tYesterday, slot)) {
+        previousSlot = &slot;
+        ready = true;
+      }
+      slotCtr--;
+    }
+  }
+  
+  if (nextSlot == nullptr) {
+    time_t tomorrow = now + 86400;
+    struct tm* tTomorrow = localtime(&tomorrow);
+    
+    slotCtr = 0;
+    ready = false;
+    while(!ready && slotCtr < scheduleCount) {
+      auto& slot = schedule[slotCtr];
+      if (slot.active &&
+          isSlotActiveAtGivenDay(tTomorrow, slot)) {
+        nextSlot = &slot;
+        ready = true;
+      }
+      slotCtr++;
+    }
+  }
+  // Situations:
+  // previous | next  | result
+  // ---------+-------+----------
+  //  On      | Off   |  On
+  //  On      | On    |  Off  (failsafe)
+  //  On      | null  |  Off  (failsafe)
+  //  Off     | Off   |  Off
+  //  Off     | On    |  Off
+  //  Off     | null  |  Off
+  //  null    | On    |  Off
+  //  null    | Off   |  Off
+  //  null    | null  |  Off
+  if ( previousSlot == nullptr || nextSlot == nullptr) return PIN_OFF;
+  if ( nextSlot->action == PIN_ON) return PIN_OFF;
+  return previousSlot->action;
 }
 
 // -----------------------------------------------------------------------------
@@ -216,7 +264,6 @@ void updateSlot(int id, const TimeSlot& slot) {
   sortSchedule();
   setScheduleDirty();
 }
-
 
 // -----------------------------------------------------------------------------
 // Persistence
