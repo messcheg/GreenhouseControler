@@ -3,7 +3,6 @@
 #include "control.hpp"
 #include "schedule.hpp"
 #include "timeservice.hpp"
-#include "platform.hpp"
 
 #include <Arduino.h>
 #include <ArduinoJson.h>
@@ -31,10 +30,17 @@ void handleStatus() {
     case MODE_AUTO:             doc["mode"] = "auto"; break;
     case MODE_MANUAL:           doc["mode"] = "manual"; break;
     case MODE_AUTO_AND_MANUAL:  doc["mode"] = "auto+manual"; break;
-    case MODE_FORCED_OFF:       doc["mode"] = "off (suppressed)"; break;
+    case MODE_FORCED_OFF: 
+      switch (getOperationSuppressionState()){
+        case SUPR_UPDATE:       doc["mode"] = "off (suppressed for update)"; break;
+        case SUPR_MANUAL:       doc["mode"] = "off (suppressed manual)"; break;
+        case SUPR_MANUAL_UPDATE:doc["mode"] = "off (suppressed update+manual)"; break;
+        case SUPR_NONE:         doc["mode"] = "off (suppressed)"; break;
+      }; break;
     default:                    doc["mode"] = "off"; break;
   }
-
+  doc["operation_suppressed"] = (getOperationSuppressionState() & SUPR_MANUAL) > 0;
+  
   time_t off = getValveOffTime();
   doc["valve_off_in"] = (off > time(nullptr)) ? (off - time(nullptr)) : 0;
 
@@ -264,6 +270,20 @@ void handleUpdateSlot() {
   localServer.send(200, F("application/json"), "{\"result\":\"updated\"}");
 }
 
+void handleHoldOperation() {
+  suppressOperation(true, SUPR_MANUAL);
+  ESP8266WebServer& server = getWebServer();
+  server.send(200, F("application/json"),
+              "{\"result\":\"operation suppressed\"}");
+}
+
+void handleResumeOperation() {
+  suppressOperation(false, SUPR_MANUAL);  // if you allow manual resume
+  ESP8266WebServer& server = getWebServer();
+  server.send(200, F("application/json"),
+              "{\"result\":\"operation resumed\"}");
+}
+
 // ---- Registration ----
 void registerApiHandlers(ESP8266WebServer& server) {
   server.on("/api/schedule", HTTP_GET, handleGetSchedule);
@@ -273,5 +293,7 @@ void registerApiHandlers(ESP8266WebServer& server) {
   server.on("/api/slot/toggle", HTTP_POST, handleUpdateSlotActive);
   server.on("/api/slot/update", HTTP_POST, handleUpdateSlot);
   server.on("/api/status", HTTP_GET, handleStatus);
-  server.on("/api/led", HTTP_GET, handleLed);  
+  server.on("/api/led", HTTP_GET, handleLed);   
+  server.on("/api/hold", HTTP_POST, handleHoldOperation);
+  server.on("/api/resume", HTTP_POST, handleResumeOperation);
 }

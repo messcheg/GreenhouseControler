@@ -110,7 +110,7 @@ void initSchedule() {
   f.read((uint8_t*)schedule, sizeof(TimeSlot) * scheduleCount);
   f.close();
 
-  // ✅ IMPORTANT:
+  // IMPORTANT:
   // We sort AFTER loading to guarantee invariant,
   // even if older firmware saved unsorted data.
   sortSchedule();
@@ -214,17 +214,16 @@ PinAction actionAccordingToSchedule() {
 // -----------------------------------------------------------------------------
 void setScheduleDirty()
 {
-  scheduleDirty = true;
-  lastChangeMillis = millis();
+  scheduleDirty = true;        // (1) The order of these two assignments
+  lastChangeMillis = millis(); // (2) is essential to preserve a correct state (combined with (3) and (4))
 }
 
 void addSlot(const TimeSlot& slot) {
-  if (scheduleCount >= MAX_SLOTS) return;
-
-  schedule[scheduleCount++] = slot;
-
-  sortSchedule();          // invariant enforced
-  setScheduleDirty();
+  if (scheduleCount < MAX_SLOTS) {
+    schedule[scheduleCount++] = slot;
+    sortSchedule();          // invariant enforced
+    setScheduleDirty();
+  }
  }
 
 void deleteSlot(int id) {
@@ -262,17 +261,20 @@ void updateSlot(int id, const TimeSlot& slot) {
 void checkSchedulePersistency() {
   if (!scheduleDirty) return;
   if (millis() - lastChangeMillis < 1000) return;
+  int changeId = 0;                      // this is a failsafe to preserve the saved state 
+  while (changeId != lastChangeMillis){  // (3a) here we can check if a new change was done during our safe (combined with (1) and(2))
+    changeId = lastChangeMillis;         // (3b) this has to be stored before the state is saved
+    File f = LittleFS.open("/schedule.dat", "w");
+    if (!f) return;
 
-  File f = LittleFS.open("/schedule.dat", "w");
-  if (!f) return;
+    uint32_t magic = VERSION_MAGIC;
+    f.write((uint8_t*)&magic, sizeof(magic));
+    f.write((uint8_t*)&scheduleCount, sizeof(scheduleCount));
+    f.write((uint8_t*)schedule, sizeof(TimeSlot) * scheduleCount);
+    f.close();
 
-  uint32_t magic = VERSION_MAGIC;
-  f.write((uint8_t*)&magic, sizeof(magic));
-  f.write((uint8_t*)&scheduleCount, sizeof(scheduleCount));
-  f.write((uint8_t*)schedule, sizeof(TimeSlot) * scheduleCount);
-  f.close();
-
-  scheduleDirty = false;
+    scheduleDirty = false;  // (4) if another setDirty was performaed during the save, lastChangesMillis will be different.
+  }
 }
 
 // -----------------------------------------------------------------------------

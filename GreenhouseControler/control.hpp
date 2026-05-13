@@ -20,6 +20,13 @@ enum ControlMode {
   MODE_AUTO_AND_MANUAL
 };
 
+enum SuppressionState{// combinable with bitwise operators
+  SUPR_NONE = 0x0,
+  SUPR_UPDATE = 0x1,  // Suppression for firmwareupdate
+  SUPR_MANUAL = 0x2,   // Suppression manual
+  SUPR_MANUAL_UPDATE = 0x3 // both
+};
+
 // -----------------------------------------------------------------------------
 // Lifecycle
 // -----------------------------------------------------------------------------
@@ -45,7 +52,8 @@ void checkIrrigationStatus();
 
 void setManualOverride(int minutes);
 void clearManualOverride();
-void suppressOperation(bool isSuppressed);
+void suppressOperation(bool isSuppressed, SuppressionState reason);
+SuppressionState getOperationSuppressionState();
 
 // -----------------------------------------------------------------------------
 // Read-only state accessors (for API / UI)

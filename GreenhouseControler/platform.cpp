@@ -38,7 +38,6 @@ static void setupWiFi(const char* hostname, const char* ssid, const char* passwo
   }
 }
 
-
 void sendJsonResponse(const ArduinoJson::JsonDocument& doc)
 {
   ESP8266WebServer& server = getWebServer();
@@ -47,11 +46,8 @@ void sendJsonResponse(const ArduinoJson::JsonDocument& doc)
   server.send(200, F("application/json"), "");  // commit headers
 
   // ---- CRITICAL ESP8266 SEQUENCE ----
-  // code below eists because serializeJson(doc, server) doesn't work for the ESP8266 libraries
-  
-  // Measure JSON size
+  // code below exists because serializeJson(doc, server) doesn't work for the ESP8266 libraries
   size_t jsonSize = measureJson(doc);
-
   // Allocate buffer on heap
   std::unique_ptr<char[]> buffer(new char[jsonSize + 1]);
   if (!buffer) {
@@ -65,7 +61,7 @@ void sendJsonResponse(const ArduinoJson::JsonDocument& doc)
   server.sendContent("");
 }
 
-
+// this methods sets up the LittelFS filesystem, we use it to store our state (time and schedule)
 static void setupFileSystem() {
   if (!LittleFS.begin()) {
       Serial.println("LittleFS mount failed, trying to format");
@@ -79,22 +75,23 @@ static void setupFileSystem() {
 
 static void setupOta(const char* hostname, const char* otaPassword)
 {
-  
-ArduinoOTA.setHostname(hostname);        // you already have this
-  ArduinoOTA.setPassword(otaPassword);     // REQUIRED
+  ArduinoOTA.setHostname(hostname);      
+  ArduinoOTA.setPassword(otaPassword);   
 
   ArduinoOTA.onStart([]() {
     // Safety: ensure outputs go OFF
-    suppressOperation(true);
+    suppressOperation(true, SUPR_UPDATE);
     Serial.println("OTA update started");
   });
 
   ArduinoOTA.onEnd([]() {
     Serial.println("OTA update finished");
+    // restore the operation (usually a reboot has happend to this wouldnt be necessary)
+    suppressOperation(false, SUPR_UPDATE);
   });
 
   ArduinoOTA.onError([](ota_error_t error) {
-    suppressOperation(true);
+    suppressOperation(true, SUPR_UPDATE);
     Serial.printf("OTA error %u\n", error);
   });
 
@@ -115,9 +112,7 @@ void initPlatform(const char* hostname, const char* ssid, const char* password, 
 #ifdef OTA_ENABLED
   setupOta(hostname, otaPassword);
 #endif
-
   setupFileSystem();
-  
 }
 
 void performPlatformHandling(){  

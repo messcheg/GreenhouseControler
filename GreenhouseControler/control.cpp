@@ -13,6 +13,7 @@ static int CONTROL_PIN = -1;
 
 static PinAction pinStatus = PIN_OFF;
 static ControlMode currentMode = MODE_OFF;
+static int suppressionState = SUPR_NONE;
 
 static time_t oneTimeTimer = 0;
 static int minutesToTime = -1;
@@ -57,13 +58,21 @@ void clearManualOverride() {
   minutesToTime = -1;
 }
 
-void suppressOperation(bool isSuppressed)
+void suppressOperation(bool isSuppressed, SuppressionState reason)
 {
   if (isSuppressed ){
-    setControlPin(PIN_OFF, true);
+    if (currentMode != MODE_FORCED_OFF) setControlPin(PIN_OFF, true);
     currentMode = MODE_FORCED_OFF;
+    suppressionState |= reason;
   }
-  else if(currentMode == MODE_FORCED_OFF) currentMode = MODE_OFF; 
+  else if(currentMode == MODE_FORCED_OFF && ((suppressionState & reason) > 0)) {
+    suppressionState &= ~reason;
+    if (suppressionState == SUPR_NONE) currentMode = MODE_OFF; 
+  }
+}
+
+SuppressionState getOperationSuppressionState(){
+  return (SuppressionState)suppressionState;
 }
 
 // -----------------------------------------------------------------------------

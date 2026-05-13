@@ -169,7 +169,15 @@ static const char DASHBOARD_HTML[] PROGMEM = R"rawliteral(
   <div class="row"><span>Firmware</span><span id="fw">—</span></div>
   <div class="row"><span>Status</span><span id="status">—</span></div>
   <div class="row"><span>Output</span><span id="output">—</span></div>
-  <div class="row"><span>ControlMode</span><span id="mode">—</span></div>
+  <div class="row"><span>ControlMode</span><span id="mode">—</span></div>  
+  <div class="row">
+    <span>Operation</span>
+    <span>
+      <button id="holdBtn" onclick="holdOperation()">Hold</button>
+      <button id="resumeBtn" onclick="resumeOperation()">Resume</button>
+    </span>
+  </div>
+
   <div class="row"><span>Schedules</span><span id="slots">—</span></div>
   <div class="row"><span>Time</span><span id="time">—</span></div>
   <div class="row"><span>TimeSource</span><span id="timeSource">—</span></div>
@@ -212,7 +220,22 @@ function refresh() {
         s.controlpin === "ON"
           ? '<span class="badge-on">' + s.mode + '</span>'
           : '<span class="badge-off">'+ s.mode +'</span>';    
+      
+      const holdBtn = document.getElementById('holdBtn');
+      const resumeBtn = document.getElementById('resumeBtn');
+      holdBtn.disabled   = s.operation_suppressed;
+      resumeBtn.disabled = !s.operation_suppressed;
     });
+}
+    
+function holdOperation() {
+  fetch('/api/hold', { method: 'POST' })
+    .then(refresh);
+}
+
+function resumeOperation() {
+  fetch('/api/resume', { method: 'POST' })
+    .then(refresh);
 }
 
 refresh();
