@@ -20,7 +20,7 @@ static unsigned long lastChangeMillis = 0;
 
 
 // -----------------------------------------------------------------------------
-// Utilities (copied verbatim from monolithic code)
+// Utilities
 // -----------------------------------------------------------------------------
 
 static bool isLater(const TimeSlot& a, const TimeSlot& b) {
@@ -66,18 +66,8 @@ static bool isSlotActiveAtGivenDay(struct tm* t, TimeSlot& slot) {
 // -----------------------------------------------------------------------------
 // Sorting (IMPORTANT: this preserves schedule invariants)
 // -----------------------------------------------------------------------------
-
 static void sortSchedule() {
-  // Bubble sort, identical to original sketch
-  for (int i = 0; i < scheduleCount - 1; i++) {
-    for (int j = 0; j < scheduleCount - i - 1; j++) {
-      if (isLater(schedule[j], schedule[j + 1])) {
-        TimeSlot temp = schedule[j];
-        schedule[j] = schedule[j + 1];
-        schedule[j + 1] = temp;
-      }
-    }
-  }
+  std::sort(schedule, schedule + scheduleCount, [](const TimeSlot& a, const TimeSlot& b) {return isLater(b, a);});
 }
 
 // -----------------------------------------------------------------------------

@@ -2,6 +2,7 @@
 
 #include <LittleFS.h>
 #include <sys/time.h>
+#include <sntp.h>
 
 #warning "timeservice.cpp is being compiled"
 // -----------------------------------------------------------------------------
@@ -14,6 +15,8 @@ struct TimeBackup {
 };
 
 static time_t lastSavedTime = 0;
+
+static TimeSource currentTimeSource = COMPILE_TIME;
 
 // -----------------------------------------------------------------------------
 // Utilities
@@ -78,9 +81,30 @@ static bool restoreTimeFromFS(time_t& restoredTime) {
   return true;
 }
 
+bool isTimeSynchronized() {
+  // 1. Has SNTP ever reached a server?
+  if (sntp_getreachability(0) == 0) {
+    return false;
+  }
+
+  // 2. Is system time sane?
+  time_t now = time(nullptr);
+
+  // Example cutoff: Jan 1, 2022
+  if (now < 1640995200) {
+    return false;
+  }
+
+  return true;
+}
+
 // -----------------------------------------------------------------------------
 // Public API
 // -----------------------------------------------------------------------------
+TimeSource GetcurrentTimeSource()
+{
+  return currentTimeSource;
+}
 
 void setupTime() {
 
@@ -98,13 +122,10 @@ void setupTime() {
   time_t now = time(nullptr);
   unsigned long start = millis();
 
-  // Wait up to 15 seconds for NTP
-  while (now < 100000 && millis() - start < 15000) {
-    delay(500);
-    now = time(nullptr);
-  }
-
-  if (now >= 100000) {
+  //check NTP connectivity
+  if (isTimeSynchronized()) 
+  {
+    currentTimeSource =  NTP_SYNC;
     saveTimeToFS(now);
     lastSavedTime = now;
     return;
@@ -113,13 +134,15 @@ void setupTime() {
   // Fallback #1: filesystem
   time_t restored;
   if (restoreTimeFromFS(restored)) {
-    restored += 25; // compensate startup delay
+    currentTimeSource = FROM_STORAGE;
+    restored += 20; // compensate startup delay
     setSystemTime(restored);
     lastSavedTime = restored;
     return;
   }
 
   // Fallback #2: build time
+  currentTimeSource = COMPILE_TIME;
   struct tm tmBuild{};
   char monthStr[4];
 
@@ -146,6 +169,7 @@ void setupTime() {
 }
 
 void checkSavedTime() {
+  if (currentTimeSource !=  NTP_SYNC && isTimeSynchronized()) currentTimeSource =  NTP_SYNC; 
   time_t now = time(nullptr);
   if (now > lastSavedTime + 300) {
     saveTimeToFS(now);

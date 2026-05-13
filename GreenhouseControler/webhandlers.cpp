@@ -133,6 +133,11 @@ input[type="number"], select {
   font-size: 18px;
 }
 
+.schedule-item.inactive {
+  opacity: 0.45;
+  filter: grayscale(40%);
+}
+
 .schedule-meta {
   font-size: 14px;
   color: #555;
@@ -167,6 +172,7 @@ static const char DASHBOARD_HTML[] PROGMEM = R"rawliteral(
   <div class="row"><span>ControlMode</span><span id="mode">—</span></div>
   <div class="row"><span>Schedules</span><span id="slots">—</span></div>
   <div class="row"><span>Time</span><span id="time">—</span></div>
+  <div class="row"><span>TimeSource</span><span id="timeSource">—</span></div>
   <div class="row"><span>Uptime</span><span id="uptime">—</span></div>
   <div class="row"><span>IP</span><span id="ip">—</span></div>
 </div>
@@ -194,6 +200,7 @@ function refresh() {
       document.getElementById('status').textContent = s.status;
       document.getElementById('ip').textContent = s.ip;
       document.getElementById('time').textContent = s.time;
+      document.getElementById('timeSource').textContent = s.timeSource;
       document.getElementById('slots').textContent = s.scheduleCount;
       document.getElementById('uptime').textContent = msToTime(s.uptime_ms);
 
@@ -404,7 +411,7 @@ function load() {
       data.forEach(s => {
         
       c.innerHTML += `
-      <div class="schedule-item">
+      <div class="schedule-item  ${s.active ? '' : 'inactive'}">
         <strong>${s.hour}:${String(s.minute).padStart(2,'0')}</strong>
 
         <div class="schedule-meta">

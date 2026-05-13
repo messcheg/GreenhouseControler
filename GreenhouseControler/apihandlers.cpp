@@ -20,6 +20,13 @@ void handleStatus() {
   doc["time"] = getCurrentTimeISO8601();
   doc["scheduleCount"] = getScheduleCount();
 
+  switch (GetcurrentTimeSource()){
+    case NTP_SYNC:              doc["timeSource"] = "ntp synchronization"; break;
+    case FROM_STORAGE:          doc["timeSource"] = "restored from filesystem"; break;
+    case COMPILE_TIME:          doc["timeSource"] = "compile time"; break;
+    default:                    doc["timeSource"] = "unknown"; break;
+  }
+
   switch (getControlMode()) {
     case MODE_AUTO:             doc["mode"] = "auto"; break;
     case MODE_MANUAL:           doc["mode"] = "manual"; break;

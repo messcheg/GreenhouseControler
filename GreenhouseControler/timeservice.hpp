@@ -11,3 +11,12 @@ void checkSavedTime();
 
 // Utility for API / UI
 String getCurrentTimeISO8601();
+
+enum TimeSource
+{
+   NTP_SYNC,
+   FROM_STORAGE,
+   COMPILE_TIME
+};
+
+TimeSource GetcurrentTimeSource();
