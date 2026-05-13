@@ -82,8 +82,36 @@ void handleGetSchedule() {
     obj["startDay"] = slot.startDay;
     obj["endMonth"] = slot.endMonth;
     obj["endDay"] = slot.endDay;
+    obj["active"] = slot.active;
   }
   sendJsonResponse(doc);
+}
+
+bool handleTimeAndDateValidity( 
+  int& hour, int& minute, 
+  int& startMonth, int& startDay, 
+  int& endMonth, int& endDay){
+
+  ESP8266WebServer& localServer = getWebServer();
+  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+    localServer.send(400, "text/plain", "Invalid time");
+    return false;
+  }
+  const int maxDays[13] = {0, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+
+  // we will accept valid months or only 0's (which means always)
+  if (startMonth == 0 || endMonth == 0 || startDay == 0 || endDay == 0){
+    startMonth = endMonth = startDay = endDay = 0;
+  }
+  else if (startMonth < 1 || startMonth > 12 || 
+      endMonth < 1 || endMonth > 12 || 
+      startDay < 1 || startDay > maxDays[startMonth] ||
+      endDay < 1 || endDay > maxDays[endMonth] ) {
+    localServer.send(400, "text/plain", "Invalid date");
+    return false;
+  }
+  
+  return true;
 }
 
 void handleAddSlot() {
@@ -100,23 +128,7 @@ void handleAddSlot() {
   int endMonth   = localServer.arg("endMonth").toInt();
   int endDay     = localServer.arg("endDay").toInt();
 
-  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) {
-    localServer.send(400, "text/plain", "Invalid time");
-    return;
-  }
-  const int maxDays[13] = {0, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
-
-  // we will accept valid months or only 0's (which means always)
-  if (startMonth == 0 || endMonth == 0 || startDay == 0 || endDay == 0){
-    startMonth = endMonth = startDay = endDay = 0;
-  }
-  else if (startMonth < 1 || startMonth > 12 || 
-      endMonth < 1 || endMonth > 12 || 
-      startDay < 1 || startDay > maxDays[startMonth] ||
-      endDay < 1 || endDay > maxDays[endMonth] ) {
-    localServer.send(400, "text/plain", "Invalid date");
-    return;
-  }
+  if (!handleTimeAndDateValidity(hour, minute, startMonth, startDay, endMonth, endDay)) return;
 
   if (getScheduleCount() >= MAX_SLOTS) {
     localServer.send(409, "text/plain", "Schedule full");
@@ -222,14 +234,23 @@ void handleUpdateSlot() {
     return;
   }
 
+  int hour       = localServer.arg("hour").toInt();
+  int minute     = localServer.arg("minute").toInt();
+  int startMonth = localServer.arg("startMonth").toInt();
+  int startDay   = localServer.arg("startDay").toInt();
+  int endMonth   = localServer.arg("endMonth").toInt();
+  int endDay     = localServer.arg("endDay").toInt();
+  
+  if (!handleTimeAndDateValidity(hour, minute, startMonth, startDay, endMonth, endDay)) return;
+
   TimeSlot s;
-  s.hour       = localServer.arg("hour").toInt();
-  s.minute     = localServer.arg("minute").toInt();
+  s.hour       = hour;
+  s.minute     = minute;
   s.action     = localServer.arg("action") == "on" ? PIN_ON : PIN_OFF;
-  s.startMonth = localServer.arg("startMonth").toInt();
-  s.startDay   = localServer.arg("startDay").toInt();
-  s.endMonth   = localServer.arg("endMonth").toInt();
-  s.endDay     = localServer.arg("endDay").toInt();
+  s.startMonth = startMonth;
+  s.startDay   = startDay;
+  s.endMonth   = endMonth;
+  s.endDay     = endDay;
   s.active     = localServer.arg("active").toInt() != 0;
 
   updateSlot(id, s);   

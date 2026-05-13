@@ -413,6 +413,7 @@ function load() {
         </div>
 
         <div class="schedule-actions">
+          <label> <input type="checkbox" ${s.active ? 'checked' : ''} onchange="toggleActive(${s.id}, this.checked)"> Active </label>
           <button onclick='editSlot(${JSON.stringify(s)})'>Edit</button>
           <button class="danger" onclick='deleteSlot(${s.id})'>Delete</button>
         </div>
