@@ -38,6 +38,34 @@ static void setupWiFi(const char* hostname, const char* ssid, const char* passwo
   }
 }
 
+
+void sendJsonResponse(const ArduinoJson::JsonDocument& doc)
+{
+  ESP8266WebServer& server = getWebServer();
+  // Tell ESP8266WebServer we will stream content
+  server.setContentLength(CONTENT_LENGTH_UNKNOWN);
+  server.send(200, F("application/json"), "");  // commit headers
+
+  // ---- CRITICAL ESP8266 SEQUENCE ----
+  // code below eists because serializeJson(doc, server) doesn't work for the ESP8266 libraries
+  
+  // Measure JSON size
+  size_t jsonSize = measureJson(doc);
+
+  // Allocate buffer on heap
+  std::unique_ptr<char[]> buffer(new char[jsonSize + 1]);
+  if (!buffer) {
+    server.sendContent("{\"error\":\"out of memory\"}");
+    server.sendContent("");
+    return;
+  }
+  
+  size_t written = serializeJson(doc, buffer.get(), jsonSize + 1);
+  server.sendContent(buffer.get(), written);
+  server.sendContent("");
+}
+
+
 static void setupFileSystem() {
   if (!LittleFS.begin()) {
       Serial.println("LittleFS mount failed, trying to format");

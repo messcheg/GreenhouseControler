@@ -6,45 +6,36 @@
 #include "platform.hpp"
 
 #include <Arduino.h>
+#include <ArduinoJson.h>
 
 void handleStatus() {
-  ESP8266WebServer& localServer = getWebServer();
-  localServer.setContentLength(CONTENT_LENGTH_UNKNOWN);
-  localServer.send(200, F("application/json"), "");
-  localServer.sendContent("{\"fw\":\"" FW_VERSION "\",\"status\":\"OK\",\"ip\":\"");
-  localServer.sendContent(WiFi.localIP().toString()); 
-  localServer.sendContent("\",\"uptime_ms\":"); 
-  localServer.sendContent(String(millis())); 
-  localServer.sendContent(",\"time\":\""); 
-  localServer.sendContent(getCurrentTimeISO8601()); 
-  localServer.sendContent("\",\"scheduleCount\":"); 
-  localServer.sendContent(String(getScheduleCount()));
-  localServer.sendContent(",\"mode\":\"");
+  ESP8266WebServer& server = getWebServer();
+
+  StaticJsonDocument<512> doc;
+
+  doc["fw"] = FW_VERSION;
+  doc["status"] = "OK";
+  doc["ip"] = WiFi.localIP().toString();
+  doc["uptime_ms"] = millis();
+  doc["time"] = getCurrentTimeISO8601();
+  doc["scheduleCount"] = getScheduleCount();
 
   switch (getControlMode()) {
-    case MODE_AUTO: localServer.sendContent("auto"); break;
-    case MODE_MANUAL: localServer.sendContent("manual"); break;
-    case MODE_AUTO_AND_MANUAL: localServer.sendContent("auto+manual"); break;
-    case MODE_FORCED_OFF: localServer.sendContent("off (suppressed)"); break;
-    default: localServer.sendContent("off");
-  }
-  localServer.sendContent("\",\"valve_off_in\":");
-  time_t valveOffTime = getValveOffTime(); 
-  if (valveOffTime > time(nullptr)) {
-    localServer.sendContent(String(valveOffTime - time(nullptr))); 
-  } else {
-    localServer.sendContent("0");
+    case MODE_AUTO:             doc["mode"] = "auto"; break;
+    case MODE_MANUAL:           doc["mode"] = "manual"; break;
+    case MODE_AUTO_AND_MANUAL:  doc["mode"] = "auto+manual"; break;
+    case MODE_FORCED_OFF:       doc["mode"] = "off (suppressed)"; break;
+    default:                    doc["mode"] = "off"; break;
   }
 
-  localServer.sendContent(",\"controlpin\":\""); 
-  localServer.sendContent(String(getPinStatus() == PIN_ON ? "ON" : "OFF")); 
-  localServer.sendContent("\",\"manual_can_on\":");
-  localServer.sendContent((getControlMode() == MODE_OFF || getControlMode() == MODE_AUTO) ? "true" : "false");
+  time_t off = getValveOffTime();
+  doc["valve_off_in"] = (off > time(nullptr)) ? (off - time(nullptr)) : 0;
 
-  localServer.sendContent(",\"manual_can_off\":");
-  localServer.sendContent((getControlMode() == MODE_MANUAL || getControlMode() == MODE_AUTO_AND_MANUAL) ? "true" : "false");
-  localServer.sendContent("}");
-  localServer.sendContent("");
+  doc["controlpin"] = (getPinStatus() == PIN_ON) ? "ON" : "OFF";
+  doc["manual_can_on"] = (getControlMode() == MODE_OFF || getControlMode() == MODE_AUTO);
+  doc["manual_can_off"] = (getControlMode() == MODE_MANUAL || getControlMode() == MODE_AUTO_AND_MANUAL);
+
+  sendJsonResponse(doc);
 }
 
 void handleLed() {
@@ -71,40 +62,29 @@ void handleLed() {
 }
 
 void handleGetSchedule() {
-  ESP8266WebServer& localServer = getWebServer();
-  bool first = true;
-  String json;
-  json.reserve(1024);
-  
-  json = "[";
-  for (int i = 0; i < getScheduleCount(); i++) {
-    if (!first)
-       json +=",";
-    first = false;
-    json += "{\"id\":"; 
-    json += String(i);
-    auto slot = getSlot(i);
-    json += ",\"hour\":"; 
-    json += String(slot.hour) ;
-    json += ",\"minute\":"; 
-    json += String(slot.minute);
-    json += ",\"action\":\""; 
-    json += String(slot.action == PIN_ON ? "on" : "off"); 
-    json += "\"";
-    json += ",\"startMonth\":"; 
-    json += String(slot.startMonth);
-    json += ",\"startDay\":"; 
-    json += String(slot.startDay);
-    json += ",\"endMonth\":"; 
-    json += String(slot.endMonth);
-    json += ",\"endDay\":"; 
-    json += String(slot.endDay);
-    json += "}";
-  }
-  json += "]";
-  localServer.send(200, F("application/json"), json);
-}
+  ESP8266WebServer& server = getWebServer();
 
+  // Estimate: each slot is ~100 bytes
+  StaticJsonDocument<MAX_SLOTS * 128> doc;
+
+  JsonArray arr = doc.to<JsonArray>();
+
+  int count = getScheduleCount();
+  for (int i = 0; i < count; i++) {
+    TimeSlot slot = getSlot(i);
+
+    JsonObject obj = arr.createNestedObject();
+    obj["id"] = i;
+    obj["hour"] = slot.hour;
+    obj["minute"] = slot.minute;
+    obj["action"] = (slot.action == PIN_ON) ? "on" : "off";
+    obj["startMonth"] = slot.startMonth;
+    obj["startDay"] = slot.startDay;
+    obj["endMonth"] = slot.endMonth;
+    obj["endDay"] = slot.endDay;
+  }
+  sendJsonResponse(doc);
+}
 
 void handleAddSlot() {
   ESP8266WebServer& localServer = getWebServer();

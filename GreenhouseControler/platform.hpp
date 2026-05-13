@@ -4,6 +4,8 @@
 #include <LittleFS.h>             // Filesystem setup
 #include <ArduinoOTA.h>           // This is used for remote firmware updates
 
+#include <ArduinoJson.h>
+
 #define FW_VERSION "1.0.0"
 //#define OTA_ENABLED
 // ---------------- Hardware ----------------
@@ -26,5 +28,6 @@ void initPlatform(const char* hostname, const char* ssid, const char* password, 
 
 ESP8266WebServer& getWebServer();
 bool isConnectedToWiFi();
+void sendJsonResponse(const ArduinoJson::JsonDocument& doc);
 
 void performPlatformHandling();
