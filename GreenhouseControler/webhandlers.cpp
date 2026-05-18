@@ -186,7 +186,7 @@ static const char DASHBOARD_HTML[] PROGMEM = R"rawliteral(
 </div>
 
 <div class="card nav-links">
-  <a href="/">Dashboard</a><br>
+  <strong>Dashboard</strong><br>
   <a href="/schedule">Schedule</a><br>
   <a href="/manual">Manual</a>
 </div>
@@ -279,7 +279,7 @@ static const char MANUAL_HTML[] PROGMEM = R"rawliteral(
 <div class="card nav-links">
   <a href="/">Dashboard</a><br>
   <a href="/schedule">Schedule</a><br>
-  <a href="/manual">Manual</a>
+  <strong>Manual</strong>
 </div>
 
 <script>
@@ -417,7 +417,7 @@ static const char SCHEDULE_HTML[] PROGMEM = R"rawliteral(
 
 <div class="card nav-links">
   <a href="/">Dashboard</a><br>
-  <a href="/schedule">Schedule</a><br>
+  <strong>Schedule</strong><br>
   <a href="/manual">Manual</a>
 </div>
 
@@ -546,11 +546,12 @@ void handleNotFound() {
 }
 
 // ---- Registration ----
-void registerWebHandlers(ESP8266WebServer& server) {
-  server.on("/style.css", HTTP_GET, handleStylesheet);
-  server.on("/", HTTP_GET, handleDashboard);
-  server.on("/manual", HTTP_GET, handleManualPage);
-  server.on("/schedule", HTTP_GET, handleSchedulePage);
+void registerWebHandlers() {
+  ESP8266WebServer& localServer = getWebServer();
+  localServer.on("/style.css", HTTP_GET, handleStylesheet);
+  localServer.on("/", HTTP_GET, handleDashboard);
+  localServer.on("/manual", HTTP_GET, handleManualPage);
+  localServer.on("/schedule", HTTP_GET, handleSchedulePage);
   // the handleNotFound has to be added in the end in the main setup
 }
 

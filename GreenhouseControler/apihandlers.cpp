@@ -113,6 +113,7 @@ bool handleTimeAndDateValidity(
   const int maxDays[13] = {0, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 
   // we will accept valid months or only 0's (which means always)
+  // the exceptional 29th of february is not a problem for the schedule logic
   if (startMonth == 0 || endMonth == 0 || startDay == 0 || endDay == 0){
     startMonth = endMonth = startDay = endDay = 0;
   }
@@ -210,7 +211,6 @@ void handleOneTime() {
 }
 
 void handleUpdateSlotActive() {
-// let op: hier nog zelfde validatie uitvoeren als bij Add
 
   ESP8266WebServer& localServer = getWebServer();
   if (!localServer.hasArg("id") || !localServer.hasArg("active")) {
@@ -285,7 +285,8 @@ void handleResumeOperation() {
 }
 
 // ---- Registration ----
-void registerApiHandlers(ESP8266WebServer& server) {
+void registerApiHandlers() {
+  ESP8266WebServer& server = getWebServer();
   server.on("/api/schedule", HTTP_GET, handleGetSchedule);
   server.on("/api/slot", HTTP_POST, handleAddSlot);
   server.on("/api/slot", HTTP_DELETE, handleDeleteSlot);

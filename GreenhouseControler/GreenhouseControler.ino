@@ -14,7 +14,7 @@
 const char hostname[] = "greenhouse";
 
 // const int CONTROL_PIN = D2;
-const int CONTROL_PIN = 16;
+const int CONTROL_PIN = D2;
 
 bool connectionWasEstablished = false;
 
@@ -30,10 +30,11 @@ void setup() {
   initSchedule();
   initControl(CONTROL_PIN);
 
-  registerWebHandlers(getWebServer());
-  registerApiHandlers(getWebServer());
+  registerApiHandlers();
+  registerWebHandlers();
   // 404 handler
   getWebServer().onNotFound(handleNotFound);
+
   if (connectionWasEstablished) 
   {
     getWebServer().begin();
