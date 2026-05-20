@@ -555,17 +555,18 @@ static const char CONFIG_HTML[] PROGMEM = R"rawliteral(
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>WiFi Configuration</title>
+<title>Configuration</title>
 <link rel="stylesheet" href="/style.css">
 </head>
 
 <body>
 
-<header>WiFi Configuration</header>
+<header>Configuration</header>
 
+<!-- ================= WIFI ================= -->
 <section>
 <div class="card schedule-form">
-<h3 style="grid-column: 1 / -1;">Network Settings</h3>
+<h3 style="grid-column: 1 / -1;">WiFi Settings</h3>
 
 <label>SSID</label>
 <input id="ssid" type="text" placeholder="WiFi network">
@@ -573,13 +574,61 @@ static const char CONFIG_HTML[] PROGMEM = R"rawliteral(
 <label>Password</label>
 <input id="password" type="password" placeholder="WiFi password">
 
-<div></div>
-<div>
-  <button onclick="saveConfig()">Save</button>
-</div>
 </div>
 </section>
 
+<!-- ================= NETWORK ================= -->
+<section>
+<div class="card schedule-form">
+<h3 style="grid-column: 1 / -1;">Network Settings</h3>
+
+<label>Use DHCP</label>
+<input id="dhcp" type="checkbox" checked>
+
+<label>Static IP</label>
+<input id="ip" type="text" placeholder="192.168.1.50">
+
+<label>Gateway</label>
+<input id="gateway" type="text" placeholder="192.168.1.1">
+
+<label>Subnet</label>
+<input id="subnet" type="text" placeholder="255.255.255.0">
+
+</div>
+</section>
+
+<!-- ================= ACCESS POINT ================= -->
+<section>
+<div class="card schedule-form">
+<h3 style="grid-column: 1 / -1;">Access Point</h3>
+
+<label>Enable AP</label>
+<input id="ap_enable" type="checkbox">
+
+<label>AP SSID</label>
+<input id="ap_ssid" type="text" placeholder="MyDevice">
+
+<label>AP Password</label>
+<input id="ap_password" type="password" placeholder="password123">
+
+<div></div>
+<div>
+  <button onclick="saveConfig()">Save All</button>
+</div>
+
+</div>
+</section>
+
+<!-- ================= FACTORY RESET ================= -->
+<section>
+<div class="card">
+<button onclick="factoryReset()" style="background:red;color:white;width:100%;">
+Factory Reset
+</button>
+</div>
+</section>
+
+<!-- ================= NAV ================= -->
 <section>  
 <div class="card nav-links">
   <a href="/">Dashboard</a>
@@ -587,23 +636,40 @@ static const char CONFIG_HTML[] PROGMEM = R"rawliteral(
   <a href="/manual">Manual</a>
   <strong>Config</strong>
 </div>
-
 </section>
 
 <script>
+
 function loadConfig() {
   fetch('/api/config/get')
     .then(r => r.json())
     .then(cfg => {
       ssid.value = cfg.ssid || "";
       password.value = cfg.password || "";
+
+      dhcp.checked = cfg.dhcp !== false;
+
+      ip.value = cfg.ip || "";
+      gateway.value = cfg.gateway || "";
+      subnet.value = cfg.subnet || "";
+
+      ap_enable.checked = cfg.ap_enable || false;
+      ap_ssid.value = cfg.ap_ssid || "";
+      ap_password.value = cfg.ap_password || "";
     });
 }
 
 function saveConfig() {
   const payload =
     `ssid=${encodeURIComponent(ssid.value)}` +
-    `&password=${encodeURIComponent(password.value)}`;
+    `&password=${encodeURIComponent(password.value)}` +
+    `&dhcp=${dhcp.checked}` +
+    `&ip=${encodeURIComponent(ip.value)}` +
+    `&gateway=${encodeURIComponent(gateway.value)}` +
+    `&subnet=${encodeURIComponent(subnet.value)}` +
+    `&ap_enable=${ap_enable.checked}` +
+    `&ap_ssid=${encodeURIComponent(ap_ssid.value)}` +
+    `&ap_password=${encodeURIComponent(ap_password.value)}`;
 
   fetch('/api/config/update', {
     method: 'POST',
@@ -611,12 +677,22 @@ function saveConfig() {
     body: payload
   })
   .then(r => r.text())
-  .then(msg => {
+  .then(() => {
     alert("Saved. Device will reboot.");
   });
 }
 
+function factoryReset() {
+  if (!confirm("Are you sure? This will erase all settings.")) return;
+
+  fetch('/api/factory_reset', { method: 'POST' })
+    .then(() => {
+      alert("Device resetting...");
+    });
+}
+
 loadConfig();
+
 </script>
 
 </body>

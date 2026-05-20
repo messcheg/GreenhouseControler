@@ -1,6 +1,10 @@
 #include "platform.hpp"
 #include "control.hpp"
 
+#define DEFAULT_APNAME "greenhouse"
+#define DEFAULT_APPASS "Tomatos#123"
+
+
 // ---------------- Server ----------------
 ESP8266WebServer server(80);
 ESP8266WebServer& getWebServer()
@@ -8,10 +12,22 @@ ESP8266WebServer& getWebServer()
   return server;
 }
 
+//-------------- helper methods -----------
+
+String ipToString(const IPAddress& ip) {
+  return ip.toString();
+}
+
+IPAddress stringToIP(const String& s) {
+  IPAddress ip;
+  ip.fromString(s);
+  return ip;
+}
+
 // --------------- Accesspoint mode ------
 void startAPMode() {
   WiFi.mode(WIFI_AP);
-  WiFi.softAP("greenhouse", "Tomatos#123");
+  WiFi.softAP(DEFAULT_APNAME, DEFAULT_APPASS);
 
   Serial.println("AP Mode started");
   Serial.println(WiFi.softAPIP());
@@ -47,39 +63,89 @@ static void setupWiFi(const char* hostname, const char* ssid, const char* passwo
   }
 }
 
-bool saveConfig(const char* ssid, const char* password) {
-  
-  StaticJsonDocument<256> doc;
-  doc["ssid"] = ssid;
-  doc["password"] = password;
+bool saveConfig(const NetworkConfig& cfg) {
+  StaticJsonDocument<512> doc;
+  doc["version"] = 1; // for future use
+  doc["dhcp"] = cfg.dhcp;
+
+  doc["ip"]      = ipToString(cfg.ip);
+  doc["gateway"] = ipToString(cfg.gateway);
+  doc["subnet"]  = ipToString(cfg.subnet);
+
+  doc["ap_enable"]   = cfg.ap_enable;
+  doc["ap_ssid"]     = cfg.ap_ssid;
+  doc["ap_password"] = cfg.ap_password;
+
+  doc["sta_ssid"]     = cfg.sta_ssid;
+  doc["sta_password"] = cfg.sta_password;
 
   File f = LittleFS.open("/config.json", "w");
-  if (!f) {
-    return false;
-  }
+  if (!f) return false;
 
   serializeJson(doc, f);
   f.close();
-  
+
   return true;
 }
 
-bool loadConfig(String &ssid, String &pass) {
+bool loadConfig(NetworkConfig& cfg) {
   if (!LittleFS.exists("/config.json")) return false;
 
   File f = LittleFS.open("/config.json", "r");
   if (!f) return false;
 
-  StaticJsonDocument<256> doc;
+  StaticJsonDocument<512> doc;
   DeserializationError err = deserializeJson(doc, f);
   f.close();
 
   if (err) return false;
 
-  ssid = doc["ssid"].as<String>();
-  pass = doc["password"].as<String>();
+  cfg.dhcp = doc["dhcp"] | true;
+
+  cfg.ip      = stringToIP(doc["ip"] | "192.168.1.100");
+  cfg.gateway = stringToIP(doc["gateway"] | "192.168.1.1");
+  cfg.subnet  = stringToIP(doc["subnet"] | "255.255.255.0");
+
+  cfg.ap_enable   = doc["ap_enable"] | false;
+  cfg.ap_ssid     = doc["ap_ssid"] | DEFAULT_APNAME;
+  cfg.ap_password = doc["ap_password"] | DEFAULT_APPASS;
+
+  cfg.sta_ssid     = doc["sta_ssid"] | "";
+  cfg.sta_password = doc["sta_password"] | "";
+
   return true;
 }
+
+bool clearConfig() {
+  if (LittleFS.exists("/config.json")) {
+    return LittleFS.remove("/config.json");
+  }
+  return true;
+}
+
+void applyNetwork(NetworkConfig& cfg) {
+  WiFi.mode(WIFI_OFF);
+  delay(200);
+
+  if (cfg.ap_enable) {
+    WiFi.mode(WIFI_AP_STA);
+  } else {
+    WiFi.mode(WIFI_STA);
+  }
+
+  // STA
+  if (!cfg.dhcp) {
+    WiFi.config(cfg.ip, cfg.gateway, cfg.subnet);
+  }
+
+  WiFi.begin(cfg.sta_ssid.c_str(), cfg.sta_password.c_str());
+
+  // AP
+  if (cfg.ap_enable) {
+    WiFi.softAP(cfg.ap_ssid.c_str(), cfg.ap_password.c_str());
+  }
+}
+
 
 void sendJsonResponse(const ArduinoJson::JsonDocument& doc)
 {

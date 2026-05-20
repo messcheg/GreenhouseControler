@@ -287,36 +287,67 @@ void handleResumeOperation() {
 #include <ArduinoJson.h>
 
 void handleUpdateConfig() {
+  NetworkConfig cfg;
   ESP8266WebServer& server = getWebServer();
-  const char* ssid = server.arg("ssid").c_str();
-  const char* pass = server.arg("password").c_str();
+ 
+  cfg.dhcp = server.arg("dhcp") == "true";
+  cfg.ap_enable = server.arg("ap_enable") == "true";
 
-  if (!saveConfig(ssid, pass)){
-    server.send(500, F("application/json"),
-      "{\"error\":\"saving configuration failed\"}");
-  }
+  cfg.ip.fromString(server.arg("ip"));
+  cfg.gateway.fromString(server.arg("gateway"));
+  cfg.subnet.fromString(server.arg("subnet"));
 
-  server.send(200, F("application/json"),
-              "{\"result\":\"configuration saved, rebooting\"}");
+  cfg.ap_ssid = server.arg("ap_ssid");
+  cfg.ap_password = server.arg("ap_password");
+
+  // keep existing WiFi creds or update if included
+  cfg.sta_ssid = server.arg("ssid");
+  cfg.sta_password = server.arg("password");
+
+  saveConfig(cfg);   // EEPROM / SPIFFS
+  server.send(200, "text/plain", "OK");
+
   delay(1000);
   ESP.restart();
 }
 
 void handleGetConfig() {
-  String password; 
-  String ssid;
+  NetworkConfig cfg;
   ESP8266WebServer& server = getWebServer();
-  // Estimate: ssid + password + json is max 256 bytes
-  StaticJsonDocument<256> doc;
-  if (loadConfig(ssid, password)){
-    doc["ssid"] = ssid;
-    doc["password"] = password;
+  StaticJsonDocument<512> doc;
+
+  if (loadConfig(cfg)) {
+    doc["dhcp"] = cfg.dhcp;
+
+    doc["ip"]      = ipToString(cfg.ip);
+    doc["gateway"] = ipToString(cfg.gateway);
+    doc["subnet"]  = ipToString(cfg.subnet);
+
+    doc["ap_enable"]   = cfg.ap_enable;
+    doc["ap_ssid"]     = cfg.ap_ssid;
+    doc["ap_password"] = cfg.ap_password;
+
+    doc["sta_ssid"]     = cfg.sta_ssid;
+
+    // safe password handling 
+    doc["sta_password"] = cfg.sta_password.length() ? "********" : "";
+
+    doc["status"] = "ok";
+  } else {
+    doc["status"] = "empty";
   }
-  else{
-    doc["ssid"] = "";
-    doc["password"] = "";  
-  }
+
   sendJsonResponse(doc);
+}
+
+
+void handleFactoryReset() {
+  ESP8266WebServer& server = getWebServer();
+  clearConfig();  // erase EEPROM/SPIFFS
+  server.send(200, "text/plain", "RESET");
+
+  delay(1000);
+  ESP.restart();
 }
 
 // ---- Registration ----
@@ -334,4 +365,5 @@ void registerApiHandlers() {
   server.on("/api/resume", HTTP_POST, handleResumeOperation);
   server.on("/api/config/update", HTTP_POST, handleUpdateConfig);
   server.on("/api/config/get", HTTP_GET, handleGetConfig);
+  server.on("/api/factory_reset", HTTP_POST, handleFactoryReset);
 }

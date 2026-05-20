@@ -19,6 +19,20 @@ enum LedAction {
   LED_OFF
 };
 
+struct NetworkConfig {
+  bool dhcp;
+  IPAddress ip;
+  IPAddress gateway;
+  IPAddress subnet;
+
+  bool ap_enable;
+  String ap_ssid;
+  String ap_password;
+
+  String sta_ssid;
+  String sta_password;
+};
+
 // -----------------------------------------------------------------------------
 // Methods
 // -----------------------------------------------------------------------------
@@ -30,7 +44,13 @@ ESP8266WebServer& getWebServer();
 bool isConnectedToWiFi();
 void sendJsonResponse(const ArduinoJson::JsonDocument& doc);
 
-bool saveConfig(const char* ssid, const char* password);
-bool loadConfig(String &ssid, String &pass);
+String ipToString(const IPAddress& ip);
+IPAddress stringToIP(const String& s);
+
+bool saveConfig(const NetworkConfig& cfg);
+bool loadConfig(NetworkConfig& cfg);
+bool clearConfig();
+
+void applyNetwork(NetworkConfig& cfg);
 
 void performPlatformHandling();
