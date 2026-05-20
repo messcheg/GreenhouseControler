@@ -539,6 +539,86 @@ ESP8266WebServer& localServer = getWebServer();
     localServer.send_P(200, "text/html; charset=utf-8", SCHEDULE_HTML);
 } 
 
+static const char CONFIG_HTML[] PROGMEM = R"rawliteral(
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WiFi Configuration</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+
+<body>
+
+<header>WiFi Configuration</header>
+
+<section>
+<div class="card schedule-form">
+<h3 style="grid-column: 1 / -1;">Network Settings</h3>
+
+<label>SSID</label>
+<input id="ssid" type="text" placeholder="WiFi network">
+
+<label>Password</label>
+<input id="password" type="password" placeholder="WiFi password">
+
+<div></div>
+<div>
+  <button onclick="saveConfig()">Save</button>
+</div>
+</div>
+</section>
+
+<section>
+  <div class="card nav-links">
+    <a href="/">Dashboard</a><br>
+    <a href="/schedule">Schedule</a><br>
+    <a href="/manual">Manual</a><br>
+    <strong>WiFi Config</strong>
+  </div>
+</section>
+
+<script>
+function loadConfig() {
+  fetch('/api/config/get')
+    .then(r => r.json())
+    .then(cfg => {
+      ssid.value = cfg.ssid || "";
+      password.value = cfg.password || "";
+    });
+}
+
+function saveConfig() {
+  const payload =
+    `ssid=${encodeURIComponent(ssid.value)}` +
+    `&password=${encodeURIComponent(password.value)}`;
+
+  fetch('/api/config/update', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+    body: payload
+  })
+  .then(r => r.text())
+  .then(msg => {
+    alert("Saved. Device will reboot.");
+  });
+}
+
+loadConfig();
+</script>
+
+</body>
+</html>
+)rawliteral";
+
+
+void handleConfigPage() {
+  ESP8266WebServer& localServer = getWebServer();
+    localServer.send_P(200, "text/html; charset=utf-8",CONFIG_HTML);
+}
+
+
 void handleNotFound() {
   ESP8266WebServer& localServer = getWebServer();
   localServer.send(404, F("application/json"),
@@ -552,6 +632,6 @@ void registerWebHandlers() {
   localServer.on("/", HTTP_GET, handleDashboard);
   localServer.on("/manual", HTTP_GET, handleManualPage);
   localServer.on("/schedule", HTTP_GET, handleSchedulePage);
+  localServer.on("/config", HTTP_GET, handleConfigPage); 
   // the handleNotFound has to be added in the end in the main setup
 }
-

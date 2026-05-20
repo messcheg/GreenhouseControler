@@ -7,9 +7,6 @@
 #include "apihandlers.hpp"
 #include "wificredentials.hpp"
 
-// ---------------- WiFi credentials ----------------
-//const char ssid[]     = "SSID";
-//const char password[] = "PASSWORD";
 
 const char hostname[] = "greenhouse";
 

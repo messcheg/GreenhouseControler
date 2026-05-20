@@ -284,6 +284,41 @@ void handleResumeOperation() {
               "{\"result\":\"operation resumed\"}");
 }
 
+#include <ArduinoJson.h>
+
+void handleUpdateConfig() {
+  ESP8266WebServer& server = getWebServer();
+  const char* ssid = server.arg("ssid").c_str();
+  const char* pass = server.arg("password").c_str();
+
+  if (!saveConfig(ssid, pass)){
+    server.send(500, F("application/json"),
+      "{\"error\":\"saving configuration failed\"}");
+  }
+
+  server.send(200, F("application/json"),
+              "{\"result\":\"configuration saved, rebooting\"}");
+  delay(1000);
+  ESP.restart();
+}
+
+void handleGetConfig() {
+  String password; 
+  String ssid;
+  ESP8266WebServer& server = getWebServer();
+  // Estimate: ssid + password + json is max 256 bytes
+  StaticJsonDocument<256> doc;
+  if (loadConfig(ssid, password)){
+    doc["ssid"] = ssid;
+    doc["password"] = password;
+  }
+  else{
+    doc["ssid"] = "";
+    doc["password"] = "";  
+  }
+  sendJsonResponse(doc);
+}
+
 // ---- Registration ----
 void registerApiHandlers() {
   ESP8266WebServer& server = getWebServer();
@@ -297,4 +332,6 @@ void registerApiHandlers() {
   server.on("/api/led", HTTP_GET, handleLed);   
   server.on("/api/hold", HTTP_POST, handleHoldOperation);
   server.on("/api/resume", HTTP_POST, handleResumeOperation);
+  server.on("/api/config/update", HTTP_POST, handleUpdateConfig);
+  server.on("/api/config/get", HTTP_GET, handleGetConfig);
 }

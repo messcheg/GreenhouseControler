@@ -30,4 +30,7 @@ ESP8266WebServer& getWebServer();
 bool isConnectedToWiFi();
 void sendJsonResponse(const ArduinoJson::JsonDocument& doc);
 
+bool saveConfig(const char* ssid, const char* password);
+bool loadConfig(String &ssid, String &pass);
+
 void performPlatformHandling();

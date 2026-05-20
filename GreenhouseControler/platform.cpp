@@ -8,6 +8,15 @@ ESP8266WebServer& getWebServer()
   return server;
 }
 
+// --------------- Accesspoint mode ------
+void startAPMode() {
+  WiFi.mode(WIFI_AP);
+  WiFi.softAP("greenhouse", "Tomatos#123");
+
+  Serial.println("AP Mode started");
+  Serial.println(WiFi.softAPIP());
+}
+
 // ---------------- Setup ----------------
 static void setupWiFi(const char* hostname, const char* ssid, const char* password) {
   WiFi.hostname(hostname);
@@ -36,6 +45,40 @@ static void setupWiFi(const char* hostname, const char* ssid, const char* passwo
     Serial.println();
     Serial.println("Connection failed to start, continuing without internet!!");
   }
+}
+
+bool saveConfig(const char* ssid, const char* password) {
+  
+  StaticJsonDocument<256> doc;
+  doc["ssid"] = ssid;
+  doc["password"] = password;
+
+  File f = LittleFS.open("/config.json", "w");
+  if (!f) {
+    return false;
+  }
+
+  serializeJson(doc, f);
+  f.close();
+  
+  return true;
+}
+
+bool loadConfig(String &ssid, String &pass) {
+  if (!LittleFS.exists("/config.json")) return false;
+
+  File f = LittleFS.open("/config.json", "r");
+  if (!f) return false;
+
+  StaticJsonDocument<256> doc;
+  DeserializationError err = deserializeJson(doc, f);
+  f.close();
+
+  if (err) return false;
+
+  ssid = doc["ssid"].as<String>();
+  pass = doc["password"].as<String>();
+  return true;
 }
 
 void sendJsonResponse(const ArduinoJson::JsonDocument& doc)
