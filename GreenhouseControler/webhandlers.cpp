@@ -85,10 +85,17 @@ input[type="number"], select {
     font-size: 16px;
     box-sizing: border-box;
 }
-.nav-links a {
-    display: block;
-    padding: 8px 0;
-    font-size: 18px;
+
+.nav-links {
+  display: flex;
+  gap: 10px;
+  justify-content: space-around;
+}
+
+.nav-links a,
+.nav-links strong {
+  flex: 1;
+  text-align: center;
 }
 
 /* --- Schedule form layout --- */
@@ -186,9 +193,10 @@ static const char DASHBOARD_HTML[] PROGMEM = R"rawliteral(
 </div>
 
 <div class="card nav-links">
-  <strong>Dashboard</strong><br>
-  <a href="/schedule">Schedule</a><br>
+  <strong>Dashboard</strong>
+  <a href="/schedule">Schedule</a>
   <a href="/manual">Manual</a>
+  <a href="/config">Config</a>
 </div>
 
 <script>
@@ -277,11 +285,11 @@ static const char MANUAL_HTML[] PROGMEM = R"rawliteral(
 </div>
 
 <div class="card nav-links">
-  <a href="/">Dashboard</a><br>
-  <a href="/schedule">Schedule</a><br>
+  <a href="/">Dashboard</a>
+  <a href="/schedule">Schedule</a>
   <strong>Manual</strong>
+  <a href="/config">Config</a>
 </div>
-
 <script>
 let manualRemainingSeconds = 0;
 
@@ -416,10 +424,12 @@ static const char SCHEDULE_HTML[] PROGMEM = R"rawliteral(
 </section>
 
 <div class="card nav-links">
-  <a href="/">Dashboard</a><br>
-  <strong>Schedule</strong><br>
+  <a href="/">Dashboard</a>
+  <strong>Schedule</strong>
   <a href="/manual">Manual</a>
+  <a href="/config">Config</a>
 </div>
+
 
 <script>
 let editingId = null;
@@ -570,13 +580,14 @@ static const char CONFIG_HTML[] PROGMEM = R"rawliteral(
 </div>
 </section>
 
-<section>
-  <div class="card nav-links">
-    <a href="/">Dashboard</a><br>
-    <a href="/schedule">Schedule</a><br>
-    <a href="/manual">Manual</a><br>
-    <strong>WiFi Config</strong>
-  </div>
+<section>  
+<div class="card nav-links">
+  <a href="/">Dashboard</a>
+  <a href="/schedule">Schedule</a>
+  <a href="/manual">Manual</a>
+  <strong>Config</strong>
+</div>
+
 </section>
 
 <script>
