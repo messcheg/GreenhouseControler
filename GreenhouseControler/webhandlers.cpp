@@ -661,8 +661,8 @@ function loadConfig() {
 
 function saveConfig() {
   const payload =
-    `ssid=${encodeURIComponent(sta_ssid.value)}` +
-    `&password=${encodeURIComponent(sta_password.value)}` +
+    `sta_ssid=${encodeURIComponent(sta_ssid.value)}` +
+    `&sta_password=${encodeURIComponent(sta_password.value)}` +
     `&dhcp=${dhcp.checked}` +
     `&ip=${encodeURIComponent(ip.value)}` +
     `&gateway=${encodeURIComponent(gateway.value)}` +

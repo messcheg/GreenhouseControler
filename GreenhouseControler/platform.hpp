@@ -31,6 +31,8 @@ struct NetworkConfig {
 
   String sta_ssid;
   String sta_password;
+
+  String hostname;
 };
 
 // -----------------------------------------------------------------------------
@@ -38,7 +40,7 @@ struct NetworkConfig {
 // -----------------------------------------------------------------------------
 void setLed(LedAction action);
 
-void initPlatform(const char* hostname, const char* ssid, const char* password, const char* otaPassword);
+void initPlatform();
 
 ESP8266WebServer& getWebServer();
 bool isConnectedToWiFi();
@@ -47,8 +49,8 @@ void sendJsonResponse(const ArduinoJson::JsonDocument& doc);
 String ipToString(const IPAddress& ip);
 IPAddress stringToIP(const String& s);
 
-bool saveConfig(const NetworkConfig& cfg);
-bool loadConfig(NetworkConfig& cfg);
+const NetworkConfig getConfig();
+bool setConfig(const NetworkConfig& cfg);
 bool clearConfig();
 
 void applyNetwork(NetworkConfig& cfg);

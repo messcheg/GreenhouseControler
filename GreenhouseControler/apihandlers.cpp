@@ -311,7 +311,7 @@ void handleUpdateConfig() {
     cfg.sta_password = hiddenPassword;
   } else cfg.sta_password = pwd;
 
-  saveConfig(cfg);   // EEPROM / SPIFFS
+  setConfig(cfg);   // EEPROM / SPIFFS
   server.send(200, "text/plain", "OK");
 
   delay(1000);
@@ -319,37 +319,32 @@ void handleUpdateConfig() {
 }
 
 void handleGetConfig() {
-  NetworkConfig cfg;
+  const NetworkConfig cfg = getConfig();
   ESP8266WebServer& server = getWebServer();
   StaticJsonDocument<512> doc;
 
-  if (loadConfig(cfg)) {
-    doc["dhcp"] = cfg.dhcp;
+  doc["dhcp"] = cfg.dhcp;
 
-    doc["ip"]      = ipToString(cfg.ip);
-    doc["gateway"] = ipToString(cfg.gateway);
-    doc["subnet"]  = ipToString(cfg.subnet);
+  doc["ip"]      = ipToString(cfg.ip);
+  doc["gateway"] = ipToString(cfg.gateway);
+  doc["subnet"]  = ipToString(cfg.subnet);
 
-    doc["ap_enable"]   = cfg.ap_enable;
-    doc["ap_ssid"]     = cfg.ap_ssid;
-    doc["ap_password"] = cfg.ap_password;
+  doc["ap_enable"]   = cfg.ap_enable;
+  doc["ap_ssid"]     = cfg.ap_ssid;
+  doc["ap_password"] = cfg.ap_password;
 
-    doc["sta_ssid"]     = cfg.sta_ssid;
+  doc["sta_ssid"]     = cfg.sta_ssid;
 
-    // safe password handling 
-    if (cfg.sta_password.length()){
-        doc["sta_password"] = displayPassword;
-        hiddenPassword = cfg.sta_password;  
-    } else doc["sta_password"] =  "";
+  // safe password handling 
+  if (cfg.sta_password.length()){
+      doc["sta_password"] = displayPassword;
+      hiddenPassword = cfg.sta_password;  
+  } else doc["sta_password"] =  "";
 
-    doc["status"] = "ok";
-  } else {
-    doc["status"] = "empty";
-  }
+  doc["status"] = "ok";
 
   sendJsonResponse(doc);
 }
-
 
 void handleFactoryReset() {
   ESP8266WebServer& server = getWebServer();

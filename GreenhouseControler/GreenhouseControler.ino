@@ -5,12 +5,7 @@
 #include "timeservice.hpp"
 #include "webhandlers.hpp"
 #include "apihandlers.hpp"
-#include "wificredentials.hpp"
 
-
-const char hostname[] = "greenhouse";
-
-// const int CONTROL_PIN = D2;
 const int CONTROL_PIN = D2;
 
 bool connectionWasEstablished = false;
@@ -18,7 +13,7 @@ bool connectionWasEstablished = false;
 void setup() {
   Serial.begin(115200);
   
-  initPlatform(hostname, ssid, password, otaPassword);
+  initPlatform();
   
   connectionWasEstablished = isConnectedToWiFi();
   // Synchronize the time
