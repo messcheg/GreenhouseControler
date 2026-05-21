@@ -7,6 +7,11 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
 
+
+const String displayPassword = "********"; 
+static String hiddenPassword = displayPassword;
+
+
 void handleStatus() {
   ESP8266WebServer& server = getWebServer();
 
@@ -300,9 +305,11 @@ void handleUpdateConfig() {
   cfg.ap_ssid = server.arg("ap_ssid");
   cfg.ap_password = server.arg("ap_password");
 
-  // keep existing WiFi creds or update if included
-  cfg.sta_ssid = server.arg("ssid");
-  cfg.sta_password = server.arg("password");
+  cfg.sta_ssid = server.arg("sta_ssid");
+  String pwd = server.arg("sta_password");
+  if (pwd == displayPassword){
+    cfg.sta_password = hiddenPassword;
+  } else cfg.sta_password = pwd;
 
   saveConfig(cfg);   // EEPROM / SPIFFS
   server.send(200, "text/plain", "OK");
@@ -330,7 +337,10 @@ void handleGetConfig() {
     doc["sta_ssid"]     = cfg.sta_ssid;
 
     // safe password handling 
-    doc["sta_password"] = cfg.sta_password.length() ? "********" : "";
+    if (cfg.sta_password.length()){
+        doc["sta_password"] = displayPassword;
+        hiddenPassword = cfg.sta_password;  
+    } else doc["sta_password"] =  "";
 
     doc["status"] = "ok";
   } else {

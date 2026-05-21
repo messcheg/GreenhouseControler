@@ -569,10 +569,10 @@ static const char CONFIG_HTML[] PROGMEM = R"rawliteral(
 <h3 style="grid-column: 1 / -1;">WiFi Settings</h3>
 
 <label>SSID</label>
-<input id="ssid" type="text" placeholder="WiFi network">
+<input id="sta_ssid" type="text" placeholder="WiFi network">
 
 <label>Password</label>
-<input id="password" type="password" placeholder="WiFi password">
+<input id="sta_password" type="password" placeholder="WiFi password">
 
 </div>
 </section>
@@ -644,8 +644,8 @@ function loadConfig() {
   fetch('/api/config/get')
     .then(r => r.json())
     .then(cfg => {
-      ssid.value = cfg.ssid || "";
-      password.value = cfg.password || "";
+      sta_ssid.value = cfg.sta_ssid || "";
+      sta_password.value = cfg.sta_password || "";
 
       dhcp.checked = cfg.dhcp !== false;
 
@@ -661,8 +661,8 @@ function loadConfig() {
 
 function saveConfig() {
   const payload =
-    `ssid=${encodeURIComponent(ssid.value)}` +
-    `&password=${encodeURIComponent(password.value)}` +
+    `ssid=${encodeURIComponent(sta_ssid.value)}` +
+    `&password=${encodeURIComponent(sta_password.value)}` +
     `&dhcp=${dhcp.checked}` +
     `&ip=${encodeURIComponent(ip.value)}` +
     `&gateway=${encodeURIComponent(gateway.value)}` +
