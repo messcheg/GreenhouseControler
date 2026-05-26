@@ -3,6 +3,8 @@
 #include "platform.hpp"
 #include "control.hpp"
 
+#define CONFIG_FILEPATH "/config.json"
+
 static NetworkConfig currentConfig;
 
 // ---------------- Server ----------------
@@ -25,14 +27,6 @@ IPAddress stringToIP(const String& s) {
 }
 
 // --------------- Network helpers ------
-void startAPMode() {
-  WiFi.mode(WIFI_AP);
-  WiFi.softAP(DEF_APNAME, DEF_APPASS);
-
-  Serial.println("AP Mode started");
-  Serial.println(WiFi.softAPIP());
-}
-
 void setDefaults(NetworkConfig& cfg) {
   cfg.dhcp = false;
   cfg.ip      = stringToIP(DEF_IP);
@@ -43,8 +37,8 @@ void setDefaults(NetworkConfig& cfg) {
   cfg.ap_ssid     = DEF_APNAME;
   cfg.ap_password = DEF_APPASS;
 
-  cfg.sta_ssid     = DEF_APNAME;
-  cfg.sta_password = DEF_APPASS;
+  cfg.sta_ssid     = "";
+  cfg.sta_password = "";
 
   cfg.hostname = DEF_HOSTNAME;
   }
@@ -65,13 +59,25 @@ bool saveConfig(const NetworkConfig& cfg) {
   doc["sta_ssid"]     = cfg.sta_ssid;
   doc["sta_password"] = cfg.sta_password;
 
-  File f = LittleFS.open("/config.json", "w");
+  File f = LittleFS.open(CONFIG_FILEPATH, "w");
   if (!f) return false;
 
-  serializeJson(doc, f);
+  size_t written = serializeJson(doc, f);
   f.flush();
+  if (f.getWriteError() != 0 )
+  {
+    Serial.println("Error: saving configuration failed!! (write error)");
+    f.close();
+    return false;
+  }
   f.close();
 
+  if (written == 0)
+  {
+    Serial.println("Error: saving configuration failed!! (no bytes written)");
+    return false;
+  }
+  
   Serial.println("Configuration saved.");
   Serial.println(cfg.sta_ssid);
 
@@ -79,18 +85,24 @@ bool saveConfig(const NetworkConfig& cfg) {
 }
 
 bool loadConfig(NetworkConfig& cfg) {
-  if (!LittleFS.exists("/config.json")){
+  if (!LittleFS.exists(CONFIG_FILEPATH)){
+    Serial.println("DEBUG: NO Configuration file found.");
     return false;
   }
-  File f = LittleFS.open("/config.json", "r");
+  File f = LittleFS.open(CONFIG_FILEPATH, "r");
   if (!f) {
+    Serial.println("ERROR: Unable to open configuration file.");
     return false;
   }
   StaticJsonDocument<512> doc;
   DeserializationError err = deserializeJson(doc, f);
   f.close();
 
-  if (err) return false;
+  if (err) {
+    Serial.print("ERROR: Deserializationm error: ");
+    Serial.println(err.c_str());
+    return false;
+  }
 
   cfg.dhcp = doc["dhcp"] | true;
 
@@ -106,13 +118,16 @@ bool loadConfig(NetworkConfig& cfg) {
   cfg.sta_password = doc["sta_password"] | "";
   cfg.hostname = DEF_HOSTNAME;
 
+  Serial.println("Configuration loaded.");
+  Serial.println(cfg.sta_ssid);
+
   return true;
 }
 
 bool clearConfig() {
   setDefaults(currentConfig);
-  if (LittleFS.exists("/config.json")) {
-    return LittleFS.remove("/config.json");
+  if (LittleFS.exists(CONFIG_FILEPATH)) {
+    return LittleFS.remove(CONFIG_FILEPATH);
   }
   return true;
 }

@@ -294,8 +294,6 @@ void handleResumeOperation() {
               "{\"result\":\"operation resumed\"}");
 }
 
-#include <ArduinoJson.h>
-
 void handleUpdateConfig() {
   NetworkConfig cfg;
   ESP8266WebServer& server = getWebServer();
@@ -303,9 +301,21 @@ void handleUpdateConfig() {
   cfg.dhcp = server.arg("dhcp") == "true";
   cfg.ap_enable = server.arg("ap_enable") == "true";
 
-  cfg.ip.fromString(server.arg("ip"));
-  cfg.gateway.fromString(server.arg("gateway"));
-  cfg.subnet.fromString(server.arg("subnet"));
+  if(!cfg.ip.fromString(server.arg("ip"))){
+    server.send(400, F("application/json"),
+              "{\"error\":\"invalid IP address\"}");
+    return;
+  }
+  if(!cfg.gateway.fromString(server.arg("gateway"))){
+    server.send(400, F("application/json"),
+              "{\"error\":\"invalid gateway address\"}");
+    return;
+  }
+  if(!cfg.subnet.fromString(server.arg("subnet"))){
+    server.send(400, F("application/json"),
+              "{\"error\":\"invalid subnet address\"}");
+    return;
+  }
 
   cfg.ap_ssid = server.arg("ap_ssid");
   cfg.ap_password = server.arg("ap_password");
@@ -316,8 +326,13 @@ void handleUpdateConfig() {
     cfg.sta_password = hiddenPassword;
   } else cfg.sta_password = pwd;
 
-  setConfig(cfg);   // EEPROM / SPIFFS
-  server.send(200, "text/plain", "OK");
+  if(!setConfig(cfg)){
+    server.send(500, F("application/json"),
+              "{\"error\":\"saving configuration failed\"}");
+    return;
+  }
+  server.send(200, F("application/json"),
+              "{\"result\":\"configuration updated\"}");
 
   delay(1000);
   ESP.restart();
