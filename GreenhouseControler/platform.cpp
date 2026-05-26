@@ -1,13 +1,7 @@
-#include "arch/cc.h"
+#include "definitions.hpp"
+//#include "arch/cc.h"
 #include "platform.hpp"
 #include "control.hpp"
-
-#define DEFAULT_APNAME "greenhouse"
-#define DEFAULT_APPASS "Tomatos#123"
-#define DEFAULT_IP "192.168.1.100"
-#define DEFAULT_SUBNETMASK "255.255.255.0"
-#define DEFAULT_GATEWAY "192.168.1.1"
-#define DEFAULT_HOSTNAME "greenhouse"
 
 static NetworkConfig currentConfig;
 
@@ -33,7 +27,7 @@ IPAddress stringToIP(const String& s) {
 // --------------- Network helpers ------
 void startAPMode() {
   WiFi.mode(WIFI_AP);
-  WiFi.softAP(DEFAULT_APNAME, DEFAULT_APPASS);
+  WiFi.softAP(DEF_APNAME, DEF_APPASS);
 
   Serial.println("AP Mode started");
   Serial.println(WiFi.softAPIP());
@@ -41,18 +35,18 @@ void startAPMode() {
 
 void setDefaults(NetworkConfig& cfg) {
   cfg.dhcp = false;
-  cfg.ip      = stringToIP(DEFAULT_IP);
-  cfg.gateway = stringToIP(DEFAULT_GATEWAY);
-  cfg.subnet  = stringToIP(DEFAULT_SUBNETMASK);
+  cfg.ip      = stringToIP(DEF_IP);
+  cfg.gateway = stringToIP(DEF_GATEWAY);
+  cfg.subnet  = stringToIP(DEF_SUBNETMASK);
 
   cfg.ap_enable   = true;
-  cfg.ap_ssid     = DEFAULT_APNAME;
-  cfg.ap_password = DEFAULT_APPASS;
+  cfg.ap_ssid     = DEF_APNAME;
+  cfg.ap_password = DEF_APPASS;
 
-  cfg.sta_ssid     = DEFAULT_APNAME;
-  cfg.sta_password = DEFAULT_APPASS;
+  cfg.sta_ssid     = DEF_APNAME;
+  cfg.sta_password = DEF_APPASS;
 
-  cfg.hostname = DEFAULT_HOSTNAME;
+  cfg.hostname = DEF_HOSTNAME;
   }
 
 bool saveConfig(const NetworkConfig& cfg) {
@@ -75,6 +69,7 @@ bool saveConfig(const NetworkConfig& cfg) {
   if (!f) return false;
 
   serializeJson(doc, f);
+  f.flush();
   f.close();
 
   Serial.println("Configuration saved.");
@@ -99,17 +94,17 @@ bool loadConfig(NetworkConfig& cfg) {
 
   cfg.dhcp = doc["dhcp"] | true;
 
-  cfg.ip      = stringToIP(doc["ip"] | DEFAULT_IP);
-  cfg.gateway = stringToIP(doc["gateway"] | DEFAULT_GATEWAY);
-  cfg.subnet  = stringToIP(doc["subnet"] | DEFAULT_SUBNETMASK);
+  cfg.ip      = stringToIP(doc["ip"] | DEF_IP);
+  cfg.gateway = stringToIP(doc["gateway"] | DEF_GATEWAY);
+  cfg.subnet  = stringToIP(doc["subnet"] | DEF_SUBNETMASK);
 
   cfg.ap_enable   = doc["ap_enable"] | false;
-  cfg.ap_ssid     = doc["ap_ssid"] | DEFAULT_APNAME;
-  cfg.ap_password = doc["ap_password"] | DEFAULT_APPASS;
+  cfg.ap_ssid     = doc["ap_ssid"] | DEF_APNAME;
+  cfg.ap_password = doc["ap_password"] | DEF_APPASS;
 
   cfg.sta_ssid     = doc["sta_ssid"] | "";
   cfg.sta_password = doc["sta_password"] | "";
-  cfg.hostname = DEFAULT_HOSTNAME;
+  cfg.hostname = DEF_HOSTNAME;
 
   return true;
 }
@@ -261,20 +256,39 @@ void setLed(LedAction action)
 }
 
 void initPlatform(){
+  pinMode(DEFAULT_PIN, INPUT);
   pinMode(LED_PIN, OUTPUT);
   digitalWrite(LED_PIN, HIGH); // LED off initially
+  setupFileSystem();
   
   setupWiFi();
 #ifdef OTA_ENABLED
   setupOta();
 #endif
-  setupFileSystem();
 }
 
 void performPlatformHandling(){  
 #ifdef OTA_ENABLED
   ArduinoOTA.handle();
 #endif  
+  if (digitalRead(DEFAULT_PIN) == LOW){
+    bool reset = true;
+    for (int i=0; i< 20; i++){
+      delay(500);
+      if (digitalRead(DEFAULT_PIN) == HIGH){ 
+        reset = false;
+        break;
+      }
+    }
+    if (reset){
+      if (clearConfig()){
+        delay(1000);
+        ESP.restart();
+      }
+    } else { // Shorter clicks start or stop a manual session
+      toggleManualOverride(DEF_MANUAL_DURATION, MA_SWITCH);
+    }
+  }
 }
 
 bool isConnectedToWiFi(){

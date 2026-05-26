@@ -3,7 +3,7 @@
 #include "control.hpp"
 #include "schedule.hpp"
 #include "timeservice.hpp"
-
+#include "definitions.hpp"
 #include <Arduino.h>
 #include <ArduinoJson.h>
 
@@ -33,7 +33,12 @@ void handleStatus() {
 
   switch (getControlMode()) {
     case MODE_AUTO:             doc["mode"] = "auto"; break;
-    case MODE_MANUAL:           doc["mode"] = "manual"; break;
+    case MODE_MANUAL:           
+      switch(getManualActionSource()){
+        case MA_WEB:            doc["mode"] = "manual (web)"; break;
+        case MA_SWITCH:         doc["mode"] = "manual (switch)"; break;
+        default:                doc["mode"] = "manual"; break;
+      } break;
     case MODE_AUTO_AND_MANUAL:  doc["mode"] = "auto+manual"; break;
     case MODE_FORCED_OFF: 
       switch (getOperationSuppressionState()){
@@ -41,7 +46,7 @@ void handleStatus() {
         case SUPR_MANUAL:       doc["mode"] = "off (suppressed manual)"; break;
         case SUPR_MANUAL_UPDATE:doc["mode"] = "off (suppressed update+manual)"; break;
         case SUPR_NONE:         doc["mode"] = "off (suppressed)"; break;
-      }; break;
+      } break;
     default:                    doc["mode"] = "off"; break;
   }
   doc["operation_suppressed"] = (getOperationSuppressionState() & SUPR_MANUAL) > 0;
@@ -198,11 +203,11 @@ void handleOneTime() {
   }
 
   String state = localServer.arg("state");
-  int duration = 10;
+  int duration = DEF_MANUAL_DURATION;
   if (localServer.hasArg("duration")) duration = localServer.arg("duration").toInt(); 
 
   if (state == "on") {
-    setManualOverride(duration);
+    setManualOverride(duration, MA_WEB);
   } else if (state == "off") {
     clearManualOverride();
   } else {

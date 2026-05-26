@@ -1,4 +1,5 @@
 //#include <Arduino.h>              // Explicit, even though .ino gets it implicitly
+#include "definitions.hpp"
 #include "platform.hpp"
 #include "control.hpp"
 #include "schedule.hpp"
@@ -6,7 +7,7 @@
 #include "webhandlers.hpp"
 #include "apihandlers.hpp"
 
-const int CONTROL_PIN = D2;
+
 
 bool connectionWasEstablished = false;
 

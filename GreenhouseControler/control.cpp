@@ -14,6 +14,7 @@ static int CONTROL_PIN = -1;
 static PinAction pinStatus = PIN_OFF;
 static ControlMode currentMode = MODE_OFF;
 static int suppressionState = SUPR_NONE;
+static ManualActionSource manualActionSource = MA_NONE;
 
 static time_t oneTimeTimer = 0;
 static int minutesToTime = -1;
@@ -49,13 +50,24 @@ void initControl(int controlPin) {
 // Manual override (EXPLICIT, no GPIO here)
 // -----------------------------------------------------------------------------
 
-void setManualOverride(int minutes) {
+void setManualOverride(int minutes, ManualActionSource source) {
   oneTimeTimer = time(nullptr);
   minutesToTime = minutes;
+  manualActionSource = source;
 }
 
 void clearManualOverride() {
   minutesToTime = -1;
+  manualActionSource = MA_NONE;
+}
+
+void toggleManualOverride(int minutes, ManualActionSource source) {
+  if( minutesToTime == -1 ) setManualOverride(minutes, source);
+  else clearManualOverride();
+}
+
+ManualActionSource getManualActionSource(){
+  return manualActionSource;
 }
 
 void suppressOperation(bool isSuppressed, SuppressionState reason)

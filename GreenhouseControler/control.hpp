@@ -20,6 +20,12 @@ enum ControlMode {
   MODE_AUTO_AND_MANUAL
 };
 
+enum ManualActionSource{
+  MA_NONE,
+  MA_SWITCH,
+  MA_WEB
+};
+
 enum SuppressionState{// combinable with bitwise operators
   SUPR_NONE = 0x0,
   SUPR_UPDATE = 0x1,  // Suppression for firmwareupdate
@@ -47,11 +53,14 @@ void initControl(int controlPin);
 void checkIrrigationStatus();
 
 // -----------------------------------------------------------------------------
-// Manual override API (NO GPIO here)
+// Manual override API
 // -----------------------------------------------------------------------------
 
-void setManualOverride(int minutes);
+void setManualOverride(int minutes, ManualActionSource source);
 void clearManualOverride();
+void toggleManualOverride(int minutes, ManualActionSource source);
+ManualActionSource getManualActionSource();
+
 void suppressOperation(bool isSuppressed, SuppressionState reason);
 SuppressionState getOperationSuppressionState();
 
