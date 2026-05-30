@@ -139,7 +139,7 @@ PinAction actionAccordingToSchedule() {
 
     if (slot.active && isSlotActiveAtGivenDay(t, slot)) 
     {
-      bool toLate = (t->tm_hour < slot.hour) || (t->tm_hour == slot.hour && t->tm_min <= slot.minute);
+      bool toLate = (t->tm_hour < slot.hour) || (t->tm_hour == slot.hour && t->tm_min < slot.minute);
 
       if (toLate){
         nextSlot = &slot;
@@ -161,14 +161,14 @@ PinAction actionAccordingToSchedule() {
   // we don't want to water forever, so we will only investigate the previous and next day  
   if (previousSlot == nullptr) {
     time_t yesterday = now - 86400;
-    struct tm* tYesterday = localtime(&yesterday);
+    struct tm tYesterday = *localtime(&yesterday);
     
     slotCtr = scheduleCount - 1;
     ready = false;
     while(!ready && slotCtr >= 0) {
       auto& slot = schedule[slotCtr];
       if (slot.active &&
-          isSlotActiveAtGivenDay(tYesterday, slot)) {
+          isSlotActiveAtGivenDay(&tYesterday, slot)) {
         previousSlot = &slot;
         ready = true;
       }
@@ -178,14 +178,14 @@ PinAction actionAccordingToSchedule() {
   
   if (nextSlot == nullptr) {
     time_t tomorrow = now + 86400;
-    struct tm* tTomorrow = localtime(&tomorrow);
+    struct tm tTomorrow = *localtime(&tomorrow);
     
     slotCtr = 0;
     ready = false;
     while(!ready && slotCtr < scheduleCount) {
       auto& slot = schedule[slotCtr];
       if (slot.active &&
-          isSlotActiveAtGivenDay(tTomorrow, slot)) {
+          isSlotActiveAtGivenDay(&tTomorrow, slot)) {
         nextSlot = &slot;
         ready = true;
       }

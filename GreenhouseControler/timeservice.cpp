@@ -108,16 +108,7 @@ TimeSource GetcurrentTimeSource()
 
 void setupTime() {
 
-  // CET / CEST
-  const long GMT_OFFSET_SEC = 3600;
-  const int DAYLIGHT_OFFSET_SEC = 3600;
-
-  configTime(
-    GMT_OFFSET_SEC,
-    DAYLIGHT_OFFSET_SEC,
-    "pool.ntp.org",
-    "time.nist.gov"
-  );
+  configTime("CET-1CEST,M3.5.0,M10.5.0/3", "pool.ntp.org", "time.nist.gov");
 
   time_t now = time(nullptr);
   unsigned long start = millis();
@@ -144,7 +135,7 @@ void setupTime() {
   // Fallback #2: build time
   currentTimeSource = COMPILE_TIME;
   struct tm tmBuild{};
-  char monthStr[4];
+  char monthStr[8]; // 4 extra bytes for safety (although month usualy should by 3 long)
 
   sscanf(__DATE__, "%3s %d %d",
          monthStr,
@@ -171,7 +162,7 @@ void setupTime() {
 void checkSavedTime() {
   if (currentTimeSource !=  NTP_SYNC && isTimeSynchronized()) currentTimeSource =  NTP_SYNC; 
   time_t now = time(nullptr);
-  if (now > lastSavedTime + 300) {
+  if (now > lastSavedTime + acceptedTimeDelay) {
     saveTimeToFS(now);
     lastSavedTime = now;
   }

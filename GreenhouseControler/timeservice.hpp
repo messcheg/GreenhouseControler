@@ -3,6 +3,8 @@
 #include <time.h>
 #include <Arduino.h>
 
+const static int acceptedTimeDelay = 7200;
+
 // Must be called once after Wi‑Fi is up
 void setupTime();
 
