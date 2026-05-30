@@ -7,7 +7,7 @@
 #include <ArduinoJson.h>
 
 #define FW_VERSION "1.0.0"
-//#define OTA_ENABLED
+#define OTA_ENABLED
 // ---------------- Hardware ----------------
 const int LED_PIN = LED_BUILTIN;  // onboard LED (active LOW)
 

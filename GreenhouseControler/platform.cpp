@@ -1,6 +1,7 @@
 #include "definitions.hpp"
 //#include "arch/cc.h"
 #include "platform.hpp"
+#include "secrets.hpp"
 #include "control.hpp"
 
 #define CONFIG_FILEPATH "/config.json"
@@ -239,7 +240,6 @@ static void setupFileSystem() {
     }
 }
 
-const char otaPassword[] = "green19700926#OTA";
 static void setupOta()
 {
   ArduinoOTA.setHostname(getConfig().hostname.c_str());      

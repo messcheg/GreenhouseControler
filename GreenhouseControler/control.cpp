@@ -1,5 +1,5 @@
 #include "control.hpp"
-
+#include "platform.hpp"
 #include <Arduino.h>
 #include <time.h>
 
@@ -33,6 +33,7 @@ static void setControlPin(PinAction action, bool force) {
       CONTROL_PIN,
       pinStatus == PIN_ON ? HIGH : LOW
     );
+    setLed(pinStatus == PIN_ON ? LED_ON : LED_OFF);
   }
 }
 

@@ -611,20 +611,16 @@ static const char CONFIG_HTML[] PROGMEM = R"rawliteral(
 <label>AP Password</label>
 <input id="ap_password" type="password" placeholder="password123">
 
-<div></div>
-<div>
-  <button onclick="saveConfig()">Save All</button>
-</div>
-
 </div>
 </section>
 
-<!-- ================= FACTORY RESET ================= -->
+<!-- ================= SAVE AND FACTORY RESET ================= -->
 <section>
 <div class="card">
-<button onclick="factoryReset()" style="background:red;color:white;width:100%;">
-Factory Reset
-</button>
+   <button onclick="saveConfig()">Save All</button>
+  <button onclick="factoryReset()" style="background:red;color:white">
+   Factory Reset
+  </button>
 </div>
 </section>
 
