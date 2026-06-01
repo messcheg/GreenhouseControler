@@ -10,5 +10,7 @@
 
 #define DEF_MANUAL_DURATION 10
 
+const unsigned long timeBeforeSafemodeFallbackMillis = 60000; // after one minute of trying to connect to the wifi-network, the system will enter AP mode.
+
 const int CONTROL_PIN = D2;
 const int DEFAULT_PIN = D1;

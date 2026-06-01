@@ -205,8 +205,8 @@ void handleOneTime() {
   String state = localServer.arg("state");
   int duration = DEF_MANUAL_DURATION;
   if (localServer.hasArg("duration")) duration = localServer.arg("duration").toInt(); 
-  if (duration < 1) duration = 1;
-  if (duration > 240) duration = 240; // Maximaal 4 uur als veiligheidsgrens
+  if (duration < 1) duration = 1; // any false input will trigger watering for only 1 minute
+  if (duration > 240) duration = 240; // Maximum 4 hours watering as safety limit.
 
   if (state == "on") {
     setManualOverride(duration, MA_WEB);

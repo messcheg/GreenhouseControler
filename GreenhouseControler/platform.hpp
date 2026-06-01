@@ -1,6 +1,7 @@
 #pragma once
 #include <ESP8266WiFi.h>          // Wi‑Fi setup
-#include <ESP8266WebServer.h>     // Web server
+#include <ESP8266WebServer.h>     // Web 
+#include <ESP8266mDNS.h>
 #include <LittleFS.h>             // Filesystem setup
 #include <ArduinoOTA.h>           // This is used for remote firmware updates
 

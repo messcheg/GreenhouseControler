@@ -1,3 +1,4 @@
+#include "core_esp8266_features.h"
 #include "definitions.hpp"
 //#include "arch/cc.h"
 #include "platform.hpp"
@@ -7,6 +8,11 @@
 #define CONFIG_FILEPATH "/config.json"
 
 static NetworkConfig currentConfig;
+static bool safemode = false;
+static bool wifiNetworkHasBeenSeen = false;
+static unsigned long wifiConnectStartedAtMilis = 0;
+static bool wifiConnectStarted = false;
+
 
 // ---------------- Server ----------------
 ESP8266WebServer server(80);
@@ -146,7 +152,7 @@ void applyNetwork(NetworkConfig& cfg) {
   WiFi.mode(WIFI_OFF);
   delay(200);
 
-  if (cfg.ap_enable) {
+  if (cfg.ap_enable || safemode) {
     WiFi.mode(WIFI_AP_STA);
     Serial.println("AP Enabled, entering mode WIFI_AP_STA");
   } else {
@@ -166,24 +172,27 @@ void applyNetwork(NetworkConfig& cfg) {
   } else Serial.println("DHCP Enabled");
 
   WiFi.begin(cfg.sta_ssid.c_str(), cfg.sta_password.c_str());
+  wifiConnectStartedAtMilis = millis();
+  wifiConnectStarted = true;
+  wifiNetworkHasBeenSeen = false;
 
   WiFi.setAutoReconnect(!cfg.ap_enable);
     
   // AP
   if (cfg.ap_enable) {
     WiFi.softAP(cfg.ap_ssid.c_str(), cfg.ap_password.c_str());
-    Serial.println("Start accesspoint:" );
+    Serial.print("Start accesspoint:" );
     Serial.println(cfg.ap_ssid);
-    Serial.println(cfg.ap_password);
   }
   else{
     Serial.println("Connecting to WiFi...");
-    int retries = 10;
+    int retries = 4;
     while ((WiFi.status() != WL_CONNECTED) && (retries-- > 0)) {
       delay(250);
       Serial.print(".");
     }
     if (WiFi.status() == WL_CONNECTED){
+      wifiNetworkHasBeenSeen = true;
       Serial.println();
       Serial.print("Connected to ");
       Serial.println(cfg.sta_ssid.c_str());
@@ -283,8 +292,21 @@ void initPlatform(){
 }
 
 void performPlatformHandling(){  
+ // Handle wificonnection
+  if (wifiConnectStarted && !wifiNetworkHasBeenSeen && !safemode){
+    if (WiFi.status() != WL_CONNECTED){
+      if (millis() - wifiConnectStartedAtMilis > timeBeforeSafemodeFallbackMillis){
+        // we tried to connect long enough, enter AP mode as safety
+        safemode = true;
+        Serial.println("Connection timeout, entering safemode (AP-Mode)!!");
+        NetworkConfig cfg = getConfig();
+        applyNetwork(cfg);
+      }
+    } else wifiNetworkHasBeenSeen = true;
+  }
 #ifdef OTA_ENABLED
   ArduinoOTA.handle();
+  MDNS.update();
 #endif  
   if (digitalRead(DEFAULT_PIN) == LOW){
     bool reset = true;
