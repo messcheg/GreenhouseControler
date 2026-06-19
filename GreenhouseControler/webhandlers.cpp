@@ -8,7 +8,11 @@ static const char CSS_HTML[] PROGMEM = R"rawliteral(
 :root {
   --bg: #f5f5f5;
   --card: #ffffff;
-  --accent: #2d7cff;
+  --accent:
+  )rawliteral"
+CSS_ACCENT_COLOR
+  R"rawliteral(
+  ;
   --danger: #c0392b;
   --border: #ddd;
 }
@@ -443,6 +447,8 @@ R"rawliteral(
 <div class="card schedule-form">
 <h3 id="editorTitle" style="grid-column: 1 / -1;">Add schedule</h3>
 
+<label>Pin</label>
+<select id="pinId"></select>
 
 <label>Time</label>
 <div class="time-row">
@@ -492,6 +498,7 @@ R"rawliteral(
 
 <script>
 let editingId = null;
+let pinMap = {};   // pinId -> pin name
 
 function load() {
   fetch('/api/schedule')
@@ -504,9 +511,11 @@ function load() {
         
       c.innerHTML += `
       <div class="schedule-item  ${s.active ? '' : 'inactive'}">
+        
         <strong>${s.hour}:${String(s.minute).padStart(2,'0')}</strong>
 
         <div class="schedule-meta">
+          ${pinMap[s.pinId] || ('Pin ' + s.pinId)}<br>
           ${s.action.toUpperCase()}<br>
           ${s.startMonth}/${s.startDay} → ${s.endMonth}/${s.endDay}
         </div>
@@ -522,9 +531,30 @@ function load() {
     });
 }
 
+function loadPins() {
+  return fetch('/api/status')
+    .then(r => r.json())
+    .then(s => {
+      const select = document.getElementById('pinId');
+      select.innerHTML = '';
+
+      pinMap = {};
+
+      s.pins.forEach(p => {
+        pinMap[p.id] = p.name;
+
+        const opt = document.createElement('option');
+        opt.value = p.id;
+        opt.textContent = p.name;
+        select.appendChild(opt);
+      });
+    });
+}
+
 function submitSlot() {
   const payload =
-    `hour=${hour.value}&minute=${minute.value}` +
+    `pinId=${pinId.value}` +
+    `&hour=${hour.value}&minute=${minute.value}` +
     `&action=${action.value}` +
     `&startMonth=${sm.value}&startDay=${sd.value}` +
     `&endMonth=${em.value}&endDay=${ed.value}` +
@@ -596,7 +626,7 @@ function editSlot(s) {
   document.getElementById('editorTitle').textContent = "Edit schedule (" + s.id + ")";
 }
 
-load();
+loadPins().then(load);
 </script>
 
 </body>

@@ -40,7 +40,7 @@ void handleStatus() {
     switch (getControlMode(i)) {
       case MODE_AUTO:             pin1["mode"] = "auto"; break;
       case MODE_MANUAL:           
-        switch(getManualActionSource()){
+        switch(getManualActionSource(i)){
           case MA_WEB:            pin1["mode"] = "manual (web)"; break;
           case MA_SWITCH:         pin1["mode"] = "manual (switch)"; break;
           default:                pin1["mode"] = "manual"; break;
@@ -105,6 +105,7 @@ void handleGetSchedule() {
 
     JsonObject obj = arr.createNestedObject();
     obj["id"] = i;
+    obj["pinId"] = slot.pinId;
     obj["hour"] = slot.hour;
     obj["minute"] = slot.minute;
     obj["action"] = (slot.action == PIN_ON) ? "on" : "off";
@@ -146,7 +147,16 @@ bool handleTimeAndDateValidity(
 }
 
 void handleAddSlot() {
-  ESP8266WebServer& localServer = getWebServer();
+  ESP8266WebServer& localServer = getWebServer();  
+  if (!localServer.hasArg("pinId")) {
+    localServer.send(400, "text/plain", "Missing pinId");
+    return;
+  }
+  int pinId = localServer.arg("pinId").toInt();
+  if (pinId < 0 || pinId >= controlPinCount) {
+    localServer.send(400, "text/plain", "Invalid pinId");
+    return;
+  }
   if (!localServer.hasArg("hour") || !localServer.hasArg("minute")) {
     localServer.send(400, "text/plain", "Missing parameters");
     return;
@@ -167,6 +177,7 @@ void handleAddSlot() {
   }
   
   TimeSlot slot;
+  slot.pinId = pinId;
   slot.hour   = hour;
   slot.minute = minute;
   slot.action = localServer.arg("action") == "on" ? PIN_ON : PIN_OFF;
@@ -231,7 +242,7 @@ void handleOneTime() {
 }
 
 void handleGetPins(){
-
+ 
 }
 
 void handleUpdateSlotActive() {
@@ -263,11 +274,19 @@ void handleUpdateSlot() {
       "{\"error\":\"missing id\"}");
     return;
   }
-
   int id = localServer.arg("id").toInt();
   if (id < 0 || id >= getScheduleCount()) {
     localServer.send(404, F("application/json"),
       "{\"error\":\"not found\"}");
+    return;
+  }
+  if (!localServer.hasArg("pinId")) {
+    localServer.send(400, "text/plain", "Missing pinId");
+    return;
+  }
+  int pinId = localServer.arg("pinId").toInt();
+  if (pinId < 0 || pinId >= controlPinCount) {
+    localServer.send(400, "text/plain", "Invalid pinId");
     return;
   }
 
@@ -281,6 +300,7 @@ void handleUpdateSlot() {
   if (!handleTimeAndDateValidity(hour, minute, startMonth, startDay, endMonth, endDay)) return;
 
   TimeSlot s;
+  s.pinId      = pinId;
   s.hour       = hour;
   s.minute     = minute;
   s.action     = localServer.arg("action") == "on" ? PIN_ON : PIN_OFF;

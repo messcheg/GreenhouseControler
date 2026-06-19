@@ -1,8 +1,8 @@
 #pragma once
 #include <Arduino.h>
 
-// #define PROFILE_GREENHOUSE
-#define PROFILE_SWIMMINGPOND
+#define PROFILE_GREENHOUSE
+// #define PROFILE_SWIMMINGPOND
 
 #ifdef PROFILE_GREENHOUSE
   #define DEF_APNAME "greenhouse"
@@ -12,6 +12,8 @@
   #define DEF_GATEWAY "192.168.1.1"
   #define DEF_HOSTNAME "geenhouse"
   #define DEF_DISPLAYNAME "Greenhouse" 
+
+  #define CSS_ACCENT_COLOR "#007C77"  
 
   #define DEF_MANUAL_DURATION 10
 
@@ -31,6 +33,8 @@
   #define DEF_GATEWAY "192.168.1.1"
   #define DEF_HOSTNAME "swimmingpond"
   #define DEF_DISPLAYNAME "Swimmingpond" 
+  
+  #define CSS_ACCENT_COLOR "#2d7cff"  
 
   #define DEF_MANUAL_DURATION 10
 

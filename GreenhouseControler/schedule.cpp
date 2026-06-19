@@ -92,7 +92,7 @@ void initSchedule() {
 
   uint32_t magic;
   f.read((uint8_t*)&magic, sizeof(magic));
-  if (magic != VERSION_MAGIC || magic != VERSION_MAGIC_V0) {
+  if (magic != VERSION_MAGIC && magic != VERSION_MAGIC_V0) {
     f.close();
     scheduleCount = 0;
     return;
