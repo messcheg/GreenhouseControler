@@ -30,34 +30,41 @@ void handleStatus() {
     case COMPILE_TIME:          doc["timeSource"] = "compile time"; break;
     default:                    doc["timeSource"] = "unknown"; break;
   }
+  
+  JsonArray pins = doc.createNestedArray("pins");
+  for (int i = 0; i<controlPinCount; i++){
+    JsonObject pin1 = pins.createNestedObject();
+    pin1["id"] = i;
+    pin1["pin"] = controlPins[i];
+    pin1["name"] = controlPinNames[i]; 
+    switch (getControlMode(i)) {
+      case MODE_AUTO:             pin1["mode"] = "auto"; break;
+      case MODE_MANUAL:           
+        switch(getManualActionSource()){
+          case MA_WEB:            pin1["mode"] = "manual (web)"; break;
+          case MA_SWITCH:         pin1["mode"] = "manual (switch)"; break;
+          default:                pin1["mode"] = "manual"; break;
+        } break;
+      case MODE_AUTO_AND_MANUAL:  pin1["mode"] = "auto+manual"; break;
+      case MODE_FORCED_OFF: 
+        switch (getOperationSuppressionState()){
+          case SUPR_UPDATE:       pin1["mode"] = "off (suppressed for update)"; break;
+          case SUPR_MANUAL:       pin1["mode"] = "off (suppressed manual)"; break;
+          case SUPR_MANUAL_UPDATE:pin1["mode"] = "off (suppressed update+manual)"; break;
+          case SUPR_NONE:         pin1["mode"] = "off (suppressed)"; break;
+        } break;
+      default:                    pin1["mode"] = "off"; break;
+    }  
+    time_t off = getValveOffTime(i);
+    pin1["valve_off_in"] = (off > time(nullptr)) ? (off - time(nullptr)) : 0;
 
-  switch (getControlMode()) {
-    case MODE_AUTO:             doc["mode"] = "auto"; break;
-    case MODE_MANUAL:           
-      switch(getManualActionSource()){
-        case MA_WEB:            doc["mode"] = "manual (web)"; break;
-        case MA_SWITCH:         doc["mode"] = "manual (switch)"; break;
-        default:                doc["mode"] = "manual"; break;
-      } break;
-    case MODE_AUTO_AND_MANUAL:  doc["mode"] = "auto+manual"; break;
-    case MODE_FORCED_OFF: 
-      switch (getOperationSuppressionState()){
-        case SUPR_UPDATE:       doc["mode"] = "off (suppressed for update)"; break;
-        case SUPR_MANUAL:       doc["mode"] = "off (suppressed manual)"; break;
-        case SUPR_MANUAL_UPDATE:doc["mode"] = "off (suppressed update+manual)"; break;
-        case SUPR_NONE:         doc["mode"] = "off (suppressed)"; break;
-      } break;
-    default:                    doc["mode"] = "off"; break;
+    pin1["manual_can_on"] = (getControlMode(i) == MODE_OFF || getControlMode(i) == MODE_AUTO);
+    pin1["manual_can_off"] = (getControlMode(i) == MODE_MANUAL || getControlMode(i) == MODE_AUTO_AND_MANUAL);
+
   }
   doc["operation_suppressed"] = (getOperationSuppressionState() & SUPR_MANUAL) > 0;
   
-  time_t off = getValveOffTime();
-  doc["valve_off_in"] = (off > time(nullptr)) ? (off - time(nullptr)) : 0;
-
-  doc["controlpin"] = (getPinStatus() == PIN_ON) ? "ON" : "OFF";
-  doc["manual_can_on"] = (getControlMode() == MODE_OFF || getControlMode() == MODE_AUTO);
-  doc["manual_can_off"] = (getControlMode() == MODE_MANUAL || getControlMode() == MODE_AUTO_AND_MANUAL);
-
+ 
   sendJsonResponse(doc);
 }
 
@@ -201,7 +208,8 @@ void handleOneTime() {
       "{\"error\":\"missing parameter: state\"}");
     return;
   }
-
+  int id = 0;
+  if (localServer.hasArg("id")) id = localServer.arg("id").toInt(); 
   String state = localServer.arg("state");
   int duration = DEF_MANUAL_DURATION;
   if (localServer.hasArg("duration")) duration = localServer.arg("duration").toInt(); 
@@ -209,9 +217,9 @@ void handleOneTime() {
   if (duration > 240) duration = 240; // Maximum 4 hours watering as safety limit.
 
   if (state == "on") {
-    setManualOverride(duration, MA_WEB);
+    setManualOverride(duration, MA_WEB, id);
   } else if (state == "off") {
-    clearManualOverride();
+    clearManualOverride(id);
   } else {
     localServer.send(400, F("application/json"),
       "{\"error\":\"state must be on or off\"}");
@@ -220,6 +228,10 @@ void handleOneTime() {
 
   localServer.send(200, F("application/json"),
     F("{\"result\":\"ok\"}"));
+}
+
+void handleGetPins(){
+
 }
 
 void handleUpdateSlotActive() {

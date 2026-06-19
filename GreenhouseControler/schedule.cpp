@@ -1,6 +1,6 @@
 
 #include "schedule.hpp"
-
+#include "compatability.hpp"
 #include <Arduino.h>
 #include <LittleFS.h>
 #include <time.h>
@@ -15,9 +15,8 @@ static int scheduleCount = 0;
 static bool scheduleDirty = false;
 static unsigned long lastChangeMillis = 0;
 
-#define VERSION_MAGIC 0x53434830  // 'SCH0'
-// the magic is'SCH0' -> changed from 'SCHD' because removed 'hasRun' property from schedule
-
+#define  VERSION_MAGIC 0x53434830  // 'SCH1'
+// the magic is'SCH1' -> changed from 'SCHD0' added multi pin
 
 // -----------------------------------------------------------------------------
 // Utilities
@@ -93,7 +92,7 @@ void initSchedule() {
 
   uint32_t magic;
   f.read((uint8_t*)&magic, sizeof(magic));
-  if (magic != VERSION_MAGIC) {
+  if (magic != VERSION_MAGIC || magic != VERSION_MAGIC_V0) {
     f.close();
     scheduleCount = 0;
     return;
@@ -106,17 +105,34 @@ void initSchedule() {
     scheduleCount = 0;
     return;
   }
-
-  f.read((uint8_t*)schedule, sizeof(TimeSlot) * scheduleCount);
+  if (magic == VERSION_MAGIC_V0 ){
+    //do something special for the previous version
+    TimeSlot_V0 schedule_V0[MAX_SLOTS];
+    f.read((uint8_t*)schedule_V0, sizeof(TimeSlot_V0) * scheduleCount);
+    for (int i = 0; i<scheduleCount; i++)
+    {
+      TimeSlot &trg = schedule[i];
+      TimeSlot_V0 &src = schedule_V0[i];
+      trg.pinId = 0;
+      trg.action = src.action;
+      trg.active = src.active;
+      trg.endDay = src.endDay;
+      trg.startDay = src.startDay;
+      trg.endMonth = src.endMonth;
+      trg.startMonth = src.startMonth;
+      trg.hour = src.hour;
+      trg.minute = src.minute; 
+    }
+  }
+  else f.read((uint8_t*)schedule, sizeof(TimeSlot) * scheduleCount);
   f.close();
 
-  // IMPORTANT:
   // We sort AFTER loading to guarantee invariant,
   // even if older firmware saved unsorted data.
   sortSchedule();
 }
 
-PinAction actionAccordingToSchedule() {
+PinAction actionAccordingToSchedule(int pinId) {
   time_t now = time(nullptr);
   struct tm* t = localtime(&now);
 
@@ -137,7 +153,7 @@ PinAction actionAccordingToSchedule() {
   while (!ready && slotCtr < scheduleCount) {
     auto& slot = schedule[slotCtr];
 
-    if (slot.active && isSlotActiveAtGivenDay(t, slot)) 
+    if (slot.pinId == pinId && slot.active && isSlotActiveAtGivenDay(t, slot)) 
     {
       bool toLate = (t->tm_hour < slot.hour) || (t->tm_hour == slot.hour && t->tm_min < slot.minute);
 
@@ -167,7 +183,8 @@ PinAction actionAccordingToSchedule() {
     ready = false;
     while(!ready && slotCtr >= 0) {
       auto& slot = schedule[slotCtr];
-      if (slot.active &&
+      if (slot.pinId == pinId &&
+          slot.active &&
           isSlotActiveAtGivenDay(&tYesterday, slot)) {
         previousSlot = &slot;
         ready = true;
@@ -184,7 +201,8 @@ PinAction actionAccordingToSchedule() {
     ready = false;
     while(!ready && slotCtr < scheduleCount) {
       auto& slot = schedule[slotCtr];
-      if (slot.active &&
+      if (slot.pinId == pinId &&
+          slot.active &&
           isSlotActiveAtGivenDay(&tTomorrow, slot)) {
         nextSlot = &slot;
         ready = true;
@@ -204,7 +222,7 @@ PinAction actionAccordingToSchedule() {
   //  null    | On    |  Off
   //  null    | Off   |  Off
   //  null    | null  |  Off
-  if ( previousSlot == nullptr || nextSlot == nullptr) return PIN_OFF;
+  if ( previousSlot == nullptr || nextSlot == nullptr) return PIN_OFF; // we don't want to turn things on forever!!
   if ( nextSlot->action == PIN_ON) return PIN_OFF;
   return previousSlot->action;
 }

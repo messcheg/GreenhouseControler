@@ -106,7 +106,7 @@ bool loadConfig(NetworkConfig& cfg) {
   f.close();
 
   if (err) {
-    Serial.print("ERROR: Deserializationm error: ");
+    Serial.print("ERROR: Deserialization error: ");
     Serial.println(err.c_str());
     return false;
   }

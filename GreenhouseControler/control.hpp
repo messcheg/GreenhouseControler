@@ -40,7 +40,7 @@ enum SuppressionState{// combinable with bitwise operators
 // Must be called once during setup()
 // - Configures GPIO
 // - Forces initial OFF state
-void initControl(int controlPin);
+void initControl();
 
 // -----------------------------------------------------------------------------
 // Core control logic
@@ -56,10 +56,10 @@ void checkIrrigationStatus();
 // Manual override API
 // -----------------------------------------------------------------------------
 
-void setManualOverride(int minutes, ManualActionSource source);
-void clearManualOverride();
-void toggleManualOverride(int minutes, ManualActionSource source);
-ManualActionSource getManualActionSource();
+void setManualOverride(int minutes, ManualActionSource source, int pinId=0);
+void clearManualOverride(int pinId=0);
+void toggleManualOverride(int minutes, ManualActionSource source, int pinId=0);
+ManualActionSource getManualActionSource(int pinId=0);
 
 void suppressOperation(bool isSuppressed, SuppressionState reason);
 SuppressionState getOperationSuppressionState();
@@ -68,6 +68,6 @@ SuppressionState getOperationSuppressionState();
 // Read-only state accessors (for API / UI)
 // -----------------------------------------------------------------------------
 
-PinAction getPinStatus();
-ControlMode getControlMode();
-time_t getValveOffTime();
+PinAction getPinStatus(int pinId=0);
+ControlMode getControlMode(int pinId=0);
+time_t getValveOffTime(int pinId=0);

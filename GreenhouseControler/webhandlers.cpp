@@ -2,6 +2,7 @@
 #include <ESP8266WiFi.h>
 #include <Arduino.h>
 #include "platform.hpp"
+#include "definitions.hpp"
 
 static const char CSS_HTML[] PROGMEM = R"rawliteral(
 :root {
@@ -167,16 +168,24 @@ static const char DASHBOARD_HTML[] PROGMEM = R"rawliteral(
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Greenhouse Status</title>
+<title>
+)rawliteral"
+DEF_DISPLAYNAME
+R"rawliteral(
+   Status
+</title>
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-<header>Greenhouse Controller</header>
+<header>
+)rawliteral"
+DEF_DISPLAYNAME
+R"rawliteral(
+  Controller</header>
 <div class="card">
   <div class="row"><span>Firmware</span><span id="fw">—</span></div>
   <div class="row"><span>Status</span><span id="status">—</span></div>
-  <div class="row"><span>Output</span><span id="output">—</span></div>
-  <div class="row"><span>ControlMode</span><span id="mode">—</span></div>  
+  <div id="pinsContainer"></div>  
   <div class="row">
     <span>Operation</span>
     <span>
@@ -208,6 +217,32 @@ function msToTime(ms) {
   return `${h}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
 }
 
+function renderPins(pins) {
+  const container = document.getElementById('pinsContainer');
+  container.innerHTML = '';
+
+  if (!pins || pins.length === 0) {
+    container.innerHTML = '<div class="row"><span>Pins</span><span>—</span></div>';
+    return;
+  }
+
+  pins.forEach(p => {
+    const row = document.createElement('div');
+    row.className = 'row';
+
+    const badge = (p.mode.startsWith("off"))
+      ? '<span class="badge-off">' +p.mode + '</span>'
+      : '<span class="badge-on">' +p.mode + '</span>';
+
+    row.innerHTML = `
+      <span>${p.name} (GPIO ${p.pin})</span>
+      <span>${badge}</span>
+    `;
+
+    container.appendChild(row);
+  });
+}
+
 function refresh() {
   fetch('/api/status')
     .then(r => r.json())
@@ -219,15 +254,7 @@ function refresh() {
       document.getElementById('timeSource').textContent = s.timeSource;
       document.getElementById('slots').textContent = s.scheduleCount;
       document.getElementById('uptime').textContent = msToTime(s.uptime_ms);
-
-      document.getElementById('output').innerHTML =
-        s.controlpin === "ON"
-          ? '<span class="badge-on">ON</span>'
-          : '<span class="badge-off">OFF</span>';
-      document.getElementById('mode').innerHTML =
-        s.controlpin === "ON"
-          ? '<span class="badge-on">' + s.mode + '</span>'
-          : '<span class="badge-off">'+ s.mode +'</span>';    
+      renderPins(s.pins);
       
       const holdBtn = document.getElementById('holdBtn');
       const resumeBtn = document.getElementById('resumeBtn');
@@ -272,16 +299,7 @@ static const char MANUAL_HTML[] PROGMEM = R"rawliteral(
 <header>Manual Control</header>
 
 <div class="card">
-  <button id="manualOnBtn" onclick="manualOn()">Manual ON</button>
-  <button id="manualOffBtn" onclick="manualOff()">Manual OFF</button>
-  <div></div>
-  <label>Duration (minutes)</label>
-  <input id="duration" type="number" value="10">
-  
-   <div id="manualRemaining"
-     style="margin-top:10px; font-size:14px; color:#555; display:none;">
-   </div>
-
+<div id="pinsContainer"></div>
 </div>
 
 <div class="card nav-links">
@@ -306,40 +324,73 @@ function formatDuration(seconds) {
   return `${m}:${String(s).padStart(2,'0')}`;
 }
 
+function renderPins(pins) {
+  const container = document.getElementById('pinsContainer');
+  container.innerHTML = '';
+
+  if (!pins || pins.length === 0) {
+    container.innerHTML = '<div>No pins available</div>';
+    return;
+  }
+
+  pins.forEach(p => {
+    const row = document.createElement('div');
+    row.className = 'card';
+    row.style.marginBottom = '10px';
+
+    const remaining = p.valve_off_in && p.valve_off_in > 0
+      ? `Manual ends in ${formatDuration(p.valve_off_in)}`
+      : '';
+
+    row.innerHTML = `
+      <div><strong>${p.name}</strong> (GPIO ${p.pin})</div>
+      <div>Mode: ${p.mode}</div>
+      <div>
+        Status:
+        ${p.controlpin === "ON"
+          ? '<span class="badge-on">ON</span>'
+          : '<span class="badge-off">OFF</span>'}
+      </div>
+
+      <div style="margin-top:8px;">
+        <button onclick="manualOn(${p.id})" ${!p.manual_can_on ? 'disabled' : ''}>
+          ON
+        </button>
+        <button onclick="manualOff(${p.id})" ${!p.manual_can_off ? 'disabled' : ''}>
+          OFF
+        </button>
+      </div>
+
+      <div style="margin-top:6px;">
+        <input id="dur-${p.id}" type="number" value="10" style="width:60px;">
+        <span>minutes</span>
+      </div>
+
+      <div style="font-size:12px; color:#555; margin-top:6px;">
+        ${remaining}
+      </div>
+    `;
+
+    container.appendChild(row);
+  });
+}
 function refreshManualState() {
   fetch('/api/status')
     .then(r => r.json())
     .then(s => {
-      
-      const onBtn  = document.getElementById('manualOnBtn');
-      const offBtn = document.getElementById('manualOffBtn');
-      const dur = document.getElementById('duration');
-      const rem    = document.getElementById('manualRemaining');
-
-      onBtn.disabled = !s.manual_can_on;
-      offBtn.disabled  = !s.manual_can_off;
-      dur.style.display = s.manual_can_on ? "inline-block" : "none";
-
-      
-      // Show remaining time until OFF
-      if (s.valve_off_in && s.valve_off_in > 0) {
-        rem.textContent =
-          "Manual mode ends in " + formatDuration(s.valve_off_in);
-        rem.style.display = "block";
-      } else {
-        rem.style.display = "none";
-      }
-      manualRemainingSeconds = s.valve_off_in || 0;
+      renderPins(s.pins);
     });
 }
 
-function manualOn() {
-  fetch(`/api/oneTime?state=on&duration=${duration.value}`)
+function manualOn(id) {
+  const duration = document.getElementById(`dur-${id}`).value;
+
+  fetch(`/api/oneTime?id=${id}&state=on&duration=${duration}`)
     .then(refreshManualState);
 }
 
-function manualOff() {
-  fetch(`/api/oneTime?state=off`)
+function manualOff(id) {
+  fetch(`/api/oneTime?id=${id}&state=off`)
     .then(refreshManualState);
 }
 
@@ -372,13 +423,21 @@ static const char SCHEDULE_HTML[] PROGMEM = R"rawliteral(
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Irrigation Scheduler</title>
+<title>
+)rawliteral"
+DEF_DISPLAYNAME
+R"rawliteral(
+ Scheduler</title>
 <link rel="stylesheet" href="/style.css">
 </head>
 
 <body>
 
-<header>Irrigation Scheduler</header>
+<header>
+)rawliteral"
+DEF_DISPLAYNAME
+R"rawliteral(
+ Scheduler</header>
 
 <section>
 <div class="card schedule-form">

@@ -12,6 +12,7 @@
 // -----------------------------------------------------------------------------
 
 struct TimeSlot {
+  int pinId;
   uint8_t hour;
   uint8_t minute;
   PinAction action;
@@ -42,7 +43,7 @@ void initSchedule();
 // - State-based (not edge-triggered)
 // - Includes yesterday fallback
 // - Seasonal logic preserved
-PinAction actionAccordingToSchedule();
+PinAction actionAccordingToSchedule(int pinId = 0);
 
 // -----------------------------------------------------------------------------
 // Schedule mutation (sorting happens internally)

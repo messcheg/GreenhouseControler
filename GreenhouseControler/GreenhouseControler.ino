@@ -21,7 +21,7 @@ void setup() {
   setupTime();
 
   initSchedule();
-  initControl(CONTROL_PIN);
+  initControl();
 
   registerApiHandlers();
   registerWebHandlers();

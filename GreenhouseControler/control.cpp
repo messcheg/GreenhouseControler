@@ -2,38 +2,43 @@
 #include "platform.hpp"
 #include <Arduino.h>
 #include <time.h>
-
+#include "definitions.hpp"
 #include "schedule.hpp"
 
 // -----------------------------------------------------------------------------
-// Internal state (copied from monolith semantics)
+// Internal state 
 // -----------------------------------------------------------------------------
+struct PinControl
+{
+  int id = 0;
+  int controlPin = -1;
+  PinAction pinStatus = PIN_OFF;
+  ControlMode currentMode = MODE_OFF;
+  ManualActionSource manualActionSource = MA_NONE;
+  time_t oneTimeTimer = 0;
+  int minutesToTime = -1;
+  time_t valveOffTime = 0;
+};
 
-static int CONTROL_PIN = -1;
+static PinControl pins[controlPinCount];
 
-static PinAction pinStatus = PIN_OFF;
-static ControlMode currentMode = MODE_OFF;
 static int suppressionState = SUPR_NONE;
-static ManualActionSource manualActionSource = MA_NONE;
-
-static time_t oneTimeTimer = 0;
-static int minutesToTime = -1;
-
-static time_t valveOffTime = 0;
 
 // -----------------------------------------------------------------------------
 // Hardware control (PRIVATE)
 // -----------------------------------------------------------------------------
 
-static void setControlPin(PinAction action, bool force) {
-  if (currentMode == MODE_FORCED_OFF) return;
-  if (force || pinStatus != action) {
-    pinStatus = action;
+static void setControlPin(int pinId, PinAction action, bool force) {
+  if (pinId >= controlPinCount) return;
+  PinControl& pin = pins[pinId];
+  if (pin.currentMode == MODE_FORCED_OFF) return;
+  if (pin.controlPin == -1) return;
+  if (force || pin.pinStatus != action) {
+    pin.pinStatus = action;
     digitalWrite(
-      CONTROL_PIN,
-      pinStatus == PIN_ON ? HIGH : LOW
+      pin.controlPin,
+      pin.pinStatus == PIN_ON ? HIGH : LOW
     );
-    setLed(pinStatus == PIN_ON ? LED_ON : LED_OFF);
   }
 }
 
@@ -41,46 +46,68 @@ static void setControlPin(PinAction action, bool force) {
 // Lifecycle
 // -----------------------------------------------------------------------------
 
-void initControl(int controlPin) {
-  CONTROL_PIN = controlPin;
-  pinMode(CONTROL_PIN, OUTPUT);
-  setControlPin(PIN_OFF, true);
+void initControl() {
+  for (int i = 0; i < controlPinCount; i++) {
+    pins[i].controlPin = controlPins[i];
+    pinMode(controlPins[i], OUTPUT);
+    setControlPin(i, PIN_OFF, true);
+  }
 }
 
 // -----------------------------------------------------------------------------
 // Manual override (EXPLICIT, no GPIO here)
 // -----------------------------------------------------------------------------
 
-void setManualOverride(int minutes, ManualActionSource source) {
-  oneTimeTimer = time(nullptr);
-  minutesToTime = minutes;
-  manualActionSource = source;
+void setManualOverride(int minutes, ManualActionSource source, int pinId) {
+  if (pinId >= controlPinCount) return;
+  PinControl& pin = pins[pinId];
+  
+  pin.oneTimeTimer = time(nullptr);
+  pin.minutesToTime = minutes;
+  pin.manualActionSource = source;
 }
 
-void clearManualOverride() {
-  minutesToTime = -1;
-  manualActionSource = MA_NONE;
+void clearManualOverride(int pinId) {
+  if (pinId >= controlPinCount) return;
+  PinControl& pin = pins[pinId];
+  
+  pin.minutesToTime = -1;
+  pin.manualActionSource = MA_NONE;
 }
 
-void toggleManualOverride(int minutes, ManualActionSource source) {
-  if( minutesToTime == -1 ) setManualOverride(minutes, source);
-  else clearManualOverride();
+void toggleManualOverride(int minutes, ManualActionSource source, int pinId) {
+  if (pinId >= controlPinCount) return;
+  PinControl& pin = pins[pinId];
+  
+  if( pin.minutesToTime == -1 ) setManualOverride(minutes, source, pinId);
+  else clearManualOverride(pinId);
 }
 
-ManualActionSource getManualActionSource(){
-  return manualActionSource;
+ManualActionSource getManualActionSource(int pinId){
+  if (pinId >= controlPinCount) return MA_NONE;
+  PinControl& pin = pins[pinId];
+  
+  return pin.manualActionSource;
 }
 
 void suppressOperation(bool isSuppressed, SuppressionState reason)
 {
   if (isSuppressed ){
-    if (currentMode != MODE_FORCED_OFF) setControlPin(PIN_OFF, true);
-    currentMode = MODE_FORCED_OFF;
+    for (int i = 0; i < controlPinCount; i++) {
+      PinControl& pin = pins[i];
+      
+      if (pin.currentMode != MODE_FORCED_OFF) setControlPin(i, PIN_OFF, true);
+      pin.currentMode = MODE_FORCED_OFF;
+    }
     suppressionState |= reason;
   }
-  else if(currentMode == MODE_FORCED_OFF && ((suppressionState & reason) > 0)) {
+  else if((suppressionState & reason) > 0) {
     suppressionState &= ~reason;
-    if (suppressionState == SUPR_NONE) currentMode = MODE_OFF; 
+    if (suppressionState == SUPR_NONE)
+      for (int i = 0; i < controlPinCount; i++) {
+      PinControl& pin = pins[i];
+      if (pin.currentMode == MODE_FORCED_OFF) pin.currentMode = MODE_OFF; 
+    }
   }
 }
 
@@ -92,11 +119,14 @@ SuppressionState getOperationSuppressionState(){
 // Manual action computation (pure logic)
 // -----------------------------------------------------------------------------
 
-static PinAction actionAccordingToManual() {
-  if (minutesToTime < 0) return PIN_OFF;
+static PinAction actionAccordingToManual(int pinId) {
+  if (pinId >= controlPinCount) return PIN_OFF;
+  PinControl& pin = pins[pinId];
+  
+  if (pin.minutesToTime < 0) return PIN_OFF;
 
   time_t now = time(nullptr);
-  if (now > oneTimeTimer + 60 * minutesToTime) {
+  if (now > pin.oneTimeTimer + 60 * pin.minutesToTime) {
     return PIN_OFF;
   }
   return PIN_ON;
@@ -107,53 +137,70 @@ static PinAction actionAccordingToManual() {
 // -----------------------------------------------------------------------------
 
 void checkIrrigationStatus() {
-  if (currentMode == MODE_FORCED_OFF) return;
-  
-  time_t now = time(nullptr);
+  bool anyPinOn = false;
+  for (int i = 0; i < controlPinCount; i++)
+  {
+    PinControl& pin = pins[i];
+    
+    if (pin.currentMode == MODE_FORCED_OFF) continue;
+    
+    time_t now = time(nullptr);
 
-  PinAction scheduleAction = actionAccordingToSchedule();
-  PinAction manualAction   = actionAccordingToManual();
+    PinAction scheduleAction = actionAccordingToSchedule(i);
+    PinAction manualAction   = actionAccordingToManual(i);
 
-  bool scheduleOn = (scheduleAction == PIN_ON);
-  bool manualOn   = (manualAction   == PIN_ON);
+    bool scheduleOn = (scheduleAction == PIN_ON);
+    bool manualOn   = (manualAction   == PIN_ON);
 
-  // Final output decision
-  PinAction result =
-    (scheduleOn || manualOn) ? PIN_ON : PIN_OFF;
+    // Final output decision
+    PinAction result =
+      (scheduleOn || manualOn) ? PIN_ON : PIN_OFF;
 
-  // Mode determination (matches monolith exactly)
-  if (scheduleOn && manualOn) {
-    currentMode = MODE_AUTO_AND_MANUAL;
-  } else if (scheduleOn) {
-    currentMode = MODE_AUTO;
-  } else if (manualOn) {
-    currentMode = MODE_MANUAL;
-  } else {
-    currentMode = MODE_OFF;
+    // Mode determination (matches monolith exactly)
+    if (scheduleOn && manualOn) {
+      pin.currentMode = MODE_AUTO_AND_MANUAL;
+      anyPinOn = true;
+    } else if (scheduleOn) {
+      pin.currentMode = MODE_AUTO;
+      anyPinOn = true;
+    } else if (manualOn) {
+      pin.currentMode = MODE_MANUAL;
+      anyPinOn = true;
+    } else {
+      pin.currentMode = MODE_OFF;
+    }
+
+    // Valve OFF time (manual dominates visibility)
+    pin.valveOffTime = 0;
+    if (manualOn) {
+      pin.valveOffTime = pin.oneTimeTimer + pin.minutesToTime * 60;
+    }
+
+    // SINGLE GPIO DECISION POINT
+    setControlPin(i, result, false);
   }
-
-  // Valve OFF time (manual dominates visibility)
-  valveOffTime = 0;
-  if (manualOn) {
-    valveOffTime = oneTimeTimer + minutesToTime * 60;
-  }
-
-  // SINGLE GPIO DECISION POINT
-  setControlPin(result, false);
+  // if any control is on --> light the led
+  setLed(anyPinOn ? LED_ON : LED_OFF);
 }
 
 // -----------------------------------------------------------------------------
 // Accessors (read‑only)
 // -----------------------------------------------------------------------------
 
-PinAction getPinStatus() {
-  return pinStatus;
+PinAction getPinStatus(int pinId) {
+  if (pinId >= controlPinCount) return PIN_OFF;
+  PinControl& pin = pins[pinId];
+  return pin.pinStatus;
 }
 
-ControlMode getControlMode() {
-  return currentMode;
+ControlMode getControlMode(int pinId) {
+  if (pinId >= controlPinCount) return MODE_OFF;
+  PinControl& pin = pins[pinId];
+  return pin.currentMode;
 }
 
-time_t getValveOffTime() {
-  return valveOffTime;
+time_t getValveOffTime(int pinId) {
+  if (pinId >= controlPinCount) return MODE_OFF;
+  PinControl& pin = pins[pinId];
+  return pin.valveOffTime;
 }
